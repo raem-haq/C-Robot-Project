@@ -10,6 +10,7 @@ void addToMoveStack(char**, char, int*, int*);
 void DFS(Robot*, int**, int**, int*, char**, int*);
 void comeBack(Robot*, char*, int, int**);
 int** initG(void);
+int loadLocations(int**, const char*, void (*)(int**, int, int));
 
 typedef enum { UNKNOWN, FREE, BLOCKED } Knowledge;
 
@@ -56,36 +57,10 @@ int main(int argc, char** argv) {
     Pixel homeYP = homeY * SQUARE_SIDE_LENGTH;
     initRobot(robotPtr, homeXP, homeYP, initDir);
 
-    // declare some file pointers
-    FILE *markerFPtr;
-    FILE *obsFPtr;
-
-    // Open the files in read mode
-    markerFPtr = fopen("data/markers.txt", "r");
-    obsFPtr = fopen("data/obstacles.txt", "r");
-
-    //If any of the files are not found, print an error message
-    if ((markerFPtr == NULL) || (obsFPtr == NULL)) {
-        printf("ERROR: FILE NOT FOUND\n");
+    if (!loadLocations(groundTruthMap, "data/markers.txt", addMarker) ||
+        !loadLocations(groundTruthMap, "data/obstacles.txt", addObstacle)) {
+        return EXIT_FAILURE;
     }
-
-
-    int x,y;
-    char line[50];//each line is only 4 characters but i've made
-
-    //read from marker file
-    while(fgets(line, sizeof(line), markerFPtr)) {
-        line[strcspn(line, "\n")] = 0;//remove null character
-        sscanf(line, "%d,%d", &x, &y);//extract x and y coordinate of marker
-        addMarker(groundTruthMap,x,y);//add marker using function from grid.h
-    }   
-
-    //read from obstacle file
-    while(fgets(line, sizeof(line), obsFPtr)) {
-        line[strcspn(line, "\n")] = 0;//remove null character
-        sscanf(line, "%d,%d", &x, &y);//extract x and y coordinate of marker
-        addObstacle(groundTruthMap,x,y);//add obstacle using function from grid.h
-    }   
 
     Pixel gridSideLength = SQUARE_SIDE_LENGTH * DIMENSIONS;
     setWindowSize(gridSideLength, gridSideLength);
@@ -110,13 +85,41 @@ int main(int argc, char** argv) {
     freeMap(isVisitedAt);
     free(moveStack);
 
-    //close files
-    fclose(markerFPtr);
-    fclose(obsFPtr);
-
     return 0;
 }
 
+
+int loadLocations(int** map, const char* filePath, void (*addLocation)(int**, int, int)) {
+    FILE *file = fopen(filePath, "r");
+    if (file == NULL) {
+        fprintf(stderr, "ERROR: Could not open %s\n", filePath);
+        return 0;
+    }
+
+    char line[50];
+    int success = 1;
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+        int x, y;
+        if (sscanf(line, "%d,%d", &x, &y) != 2 ||
+            x < 0 || x >= DIMENSIONS || y < 0 || y >= DIMENSIONS) {
+            fprintf(stderr, "ERROR: Invalid coordinates in %s: %s\n", filePath, line);
+            success = 0;
+            break;
+        }
+        addLocation(map, x, y);
+    }
+
+    if (ferror(file)) {
+        fprintf(stderr, "ERROR: Could not read %s\n", filePath);
+        success = 0;
+    }
+    if (fclose(file) != 0) {
+        fprintf(stderr, "ERROR: Could not close %s\n", filePath);
+        success = 0;
+    }
+    return success;
+}
 
 void addToMoveStack(char** moveStack, char move, int* noOfMoves, int* length) {
     if (*noOfMoves == *length) { //IF the move-array  is full

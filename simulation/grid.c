@@ -87,17 +87,17 @@ void addMarker(int** map, int x, int y) {
 
 void addObstacle(int** map, int x, int y) {
     switch (map[x][y]) {
-    case 2:
-        map[x][y] = 0;//0 for obstacle
-        break;
-    case 1:
-        printf("ERROR: CANNOT PLACE OBSTACLE ON HOME SQUARE\n");
-        break;
-    case 0:
-        break;
-    default:
-        printf("ERROR: CANNOT PLACE OBSTACLE ON MARKER\n");
-        break;
+        case 2:
+            map[x][y] = 0;//0 for obstacle
+            break;
+        case 1:
+            printf("ERROR: CANNOT PLACE OBSTACLE ON HOME SQUARE\n");
+            break;
+        case 0:
+            break;
+        default:
+            printf("ERROR: CANNOT PLACE OBSTACLE ON MARKER\n");
+            break;
     }
 }
 
