@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     KnownCell robotBeliefMap[DIMENSIONS][DIMENSIONS];
     initKnown(robotBeliefMap);
 
-    int** map = initGrid();
+    int** groundTruthMap = initGrid();
     // if home square coordinares and inital direction are not given.
     int homeXC = 0;
     int homeYC = 0;
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
         initDir = 3;
     }
     
-    addHome(map, homeXC, homeYC);//add the home square
+    addHome(groundTruthMap, homeXC, homeYC);//add the home square
 
     //declare and initialise the robot
     Robot robot;
@@ -81,14 +81,14 @@ int main(int argc, char** argv)
     while(fgets(line, sizeof(line), markerFPtr)) {
         line[strcspn(line, "\n")] = 0;//remove null character
         sscanf(line, "%d,%d", &x, &y);//extract x and y coordinate of marker
-        addMarker(map,x,y);//add marker using function from grid.h
+        addMarker(groundTruthMap,x,y);//add marker using function from grid.h
     }   
 
     //read from obstacle file
     while(fgets(line, sizeof(line), obsFPtr)) {
         line[strcspn(line, "\n")] = 0;//remove null character
         sscanf(line, "%d,%d", &x, &y);//extract x and y coordinate of marker
-        addObstacle(map,x,y);//add obstacle using function from grid.h
+        addObstacle(groundTruthMap,x,y);//add obstacle using function from grid.h
     }   
 
     int gridSideLength = SQUARE_SIDE_LENGTH * DIMENSIONS;
@@ -104,14 +104,13 @@ int main(int argc, char** argv)
 
     
     drawGrid();//draw the grid lines
-    drawForeground(robotPtr, map);//draw the robot, obstacles, markers and the home square
+    drawForeground(robotPtr, groundTruthMap);//draw the robot, obstacles, markers and the home square
 
     int** isVisitedAt = initG();//for keeping a record of which cells have been visited
-    DFS(robotPtr, isVisitedAt, map, &noOfMoves, &moveStack, &length);//my traversal algorithm
-    goHome(robotPtr, moveStack, noOfMoves, map);//the robot stops at a random place, but I want to go to the home square
+    DFS(robotPtr, isVisitedAt, groundTruthMap, &noOfMoves, &moveStack, &length);//my traversal algorithm
+    goHome(robotPtr, moveStack, noOfMoves, groundTruthMap);//the robot stops at a random place, but I want to go to the home square
 
     //free all pointers initalised with malloc
-    freeMap(map);
     freeMap(isVisitedAt);
     free(moveStack);
 
@@ -139,23 +138,23 @@ void addToMoveStack(char** moveStack, char move, int* noOfMoves, int* length){
 
 
 //this procedure is to come back to a square which had/has a marker after you've gone to the home square
-void comeBack(Robot *robotPtr, char* moveStack, int noOfMoves, int** map)
+void comeBack(Robot *robotPtr, char* moveStack, int noOfMoves, int** groundTruthMap)
 {
     char instruct;
-    turnAround(robotPtr, map);
+    turnAround(robotPtr, groundTruthMap);
     for (int i = 0; i < noOfMoves; i++)
     {
         instruct = *(moveStack+i);
         switch (instruct)
         {
             case 'F':
-                forward(robotPtr, map);
+                forward(robotPtr, groundTruthMap);
                 break;
             case 'L':
-                left(robotPtr, map);
+                left(robotPtr, groundTruthMap);
                 break;
             case 'R':
-                right(robotPtr, map);
+                right(robotPtr, groundTruthMap);
                 break;
             default:
                 break;
@@ -182,12 +181,12 @@ int** initG(void){
     return G;
 }
 
-int shouldGoForward(Robot* robotPtr, int** map, int** isVisitedAt)
+int shouldGoForward(Robot* robotPtr, int** groundTruthMap, int** isVisitedAt)
 {
     // you should go forward if you can go forward AND you have NOT visited the square in front 
     int x = robotPtr->xP/SQUARE_SIDE_LENGTH;
     int y = robotPtr->yP/SQUARE_SIDE_LENGTH;
-    int result = canForward(robotPtr, map);
+    int result = canForward(robotPtr, groundTruthMap);
     if (result)
     {
         int haveVisited;
@@ -214,59 +213,59 @@ int shouldGoForward(Robot* robotPtr, int** map, int** isVisitedAt)
 }
 
 
-void backOne(Robot* robotPtr, char* moveStack, int* noOfMoves, int** map)
+void backOne(Robot* robotPtr, char* moveStack, int* noOfMoves, int** groundTruthMap)
 {
     int haveMovedBack = 0;
     char instruct;
     //reverse all the instructions until you've gone back
-    turnAround(robotPtr, map);
+    turnAround(robotPtr, groundTruthMap);
     while (!haveMovedBack)
     {
         instruct = *(moveStack+*noOfMoves-1);
         switch (instruct)
         {
             case 'F':
-                forward(robotPtr, map);//since you've turned around, moving forward is the same ad having moved back.
+                forward(robotPtr, groundTruthMap);//since you've turned around, moving forward is the same ad having moved back.
                 haveMovedBack = 1;
                 break;
             case 'L':
-                right(robotPtr, map);
+                right(robotPtr, groundTruthMap);
                 break;
             case 'R':
-                left(robotPtr, map);
+                left(robotPtr, groundTruthMap);
                 break;
             default:
                 break;
         }
         --*(noOfMoves);
     }
-    turnAround(robotPtr, map);//turn around so you face the same direction
+    turnAround(robotPtr, groundTruthMap);//turn around so you face the same direction
 }
 
-void DFS(Robot* robotPtr, int** isVisitedAt, int** map, int* noOfMoves, char** moveStack, int* length){
+void DFS(Robot* robotPtr, int** isVisitedAt, int** groundTruthMap, int* noOfMoves, char** moveStack, int* length){
     int x = robotPtr->xP/SQUARE_SIDE_LENGTH;//convert from pixels to coordnates
     int y = robotPtr->yP/SQUARE_SIDE_LENGTH;
     isVisitedAt[x][y] = 1;
-    if (atMarker(robotPtr, map)){
-        int noMarkersAtSquare = map[x][y] - 2;//3+ means there are markers at that square
+    if (atMarker(robotPtr, groundTruthMap)){
+        int noMarkersAtSquare = groundTruthMap[x][y] - 2;//3+ means there are markers at that square
         for (int i = 0; i<noMarkersAtSquare;i++)
         {
             robotPtr->isCarryingMarker = 1;//pick up the marker
-            --map[x][y];//remove one marker from the square
-            goHome(robotPtr, *moveStack, *noOfMoves, map);//go home
+            --groundTruthMap[x][y];//remove one marker from the square
+            goHome(robotPtr, *moveStack, *noOfMoves, groundTruthMap);//go home
             robotPtr->isCarryingMarker = 0;//drop the marker
-            comeBack(robotPtr, *moveStack, *noOfMoves, map);// and come back to this square
+            comeBack(robotPtr, *moveStack, *noOfMoves, groundTruthMap);// and come back to this square
         }
     }
         //loop 4 times for each direction
         for (int i = 0; i< 4; i++){
-            if (shouldGoForward(robotPtr, map, isVisitedAt)){//keep recursing until you can't/shouldn't go forwards, e.g., if there is no unvisited squares
-                forward(robotPtr, map);
+            if (shouldGoForward(robotPtr, groundTruthMap, isVisitedAt)){//keep recursing until you can't/shouldn't go forwards, e.g., if there is no unvisited squares
+                forward(robotPtr, groundTruthMap);
                 addToMoveStack(moveStack, 'F', noOfMoves, length);
-                DFS(robotPtr, isVisitedAt, map, noOfMoves, moveStack, length);//keep recursing
-                backOne(robotPtr, *moveStack, noOfMoves, map);
+                DFS(robotPtr, isVisitedAt, groundTruthMap, noOfMoves, moveStack, length);//keep recursing
+                backOne(robotPtr, *moveStack, noOfMoves, groundTruthMap);
             }
-            left(robotPtr, map);
+            left(robotPtr, groundTruthMap);
             addToMoveStack(moveStack, 'L', noOfMoves, length);
         }
 }
@@ -275,8 +274,6 @@ void DFS(Robot* robotPtr, int** isVisitedAt, int** map, int* noOfMoves, char** m
 void aStarReturn(Robot* robotPtr){
     (void)robotPtr;
 }
-
-
 
 void initKnown(KnownCell belief[DIMENSIONS][DIMENSIONS]){
     for (int i = 0; i< DIMENSIONS; i++) {

@@ -22,35 +22,16 @@ map[x][y] -- meaning
 3+ -- 1+ marker
 */
 int** initGrid(void){
-    int** map = malloc(DIMENSIONS*sizeof(int*));
-    if (map == NULL)
-    {
-        printf("ERROR: Memory allocation of \"map\" failed\n");
-    }
+    int** map[DIMENSIONS][DIMENSIONS];
     for (int i = 0; i < DIMENSIONS; i++)
     {
-        *(map + i) = malloc(DIMENSIONS * sizeof(int));
-        if (*(map + i) == NULL)
-        {
-            printf("ERROR: Memory allocation of \"(map+%d)\" failed\n", i);
-        }
         for (int j = 0; j < DIMENSIONS; j++)
         {
-            *(*(map + i) + j) = 2;
+            map[i][j] = 2;
         }
     }
     return map;
 }
-
-
-
-void freeMap(int** map){
-    for (int i = 0; i< DIMENSIONS; i++){
-        free(*(map+i));
-    }
-    free(map);
-}
-
 /*
 map[x][y] -- meaning -- colour
 3+ -- 1+ marker -- grey for one marker, yellow for multiple
@@ -64,21 +45,21 @@ void displayBlocksAndGoals(int **map)
     {
         for (int j = 0; j < DIMENSIONS; j++)
         {
-            if (*(*(map + i) + j) == 1){
+            if (map[i][j] == 1){
                 setColour(green);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
             }            
-            else if (*(*(map + i) + j) == 0)
+            else if (map[i][j] == 0)
             {
                 setColour(black);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
             }
-            else if (*(*(map + i) + j) == 3)
+            else if (map[i][j] == 3)
             {
                 setColour(lightgray);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
             }
-            else if (*(*(map + i) + j) > 3)
+            else if (map[i][j] > 3)
             {
                 setColour(yellow);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
