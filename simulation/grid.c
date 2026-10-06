@@ -21,12 +21,10 @@ map[x][y] -- meaning
 0 -- obstacle
 3+ -- 1+ marker
 */
-int** initGrid(void){
+int** initGrid(void) {
     int** map[DIMENSIONS][DIMENSIONS];
-    for (int i = 0; i < DIMENSIONS; i++)
-    {
-        for (int j = 0; j < DIMENSIONS; j++)
-        {
+    for (int i = 0; i < DIMENSIONS; i++) {
+        for (int j = 0; j < DIMENSIONS; j++) {
             map[i][j] = 2;
         }
     }
@@ -39,28 +37,19 @@ map[x][y] -- meaning -- colour
 1 -- home -- green
 0 -- obstacle -- black
 */
-void displayBlocksAndGoals(int **map)
-{
-    for (int i = 0; i < DIMENSIONS; i++)
-    {
-        for (int j = 0; j < DIMENSIONS; j++)
-        {
-            if (map[i][j] == 1){
+void displayBlocksAndGoals(int **map) {
+    for (int i = 0; i < DIMENSIONS; i++) {
+        for (int j = 0; j < DIMENSIONS; j++) {
+            if (map[i][j] == 1) {
                 setColour(green);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
-            }            
-            else if (map[i][j] == 0)
-            {
+            } else if (map[i][j] == 0) {
                 setColour(black);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
-            }
-            else if (map[i][j] == 3)
-            {
+            } else if (map[i][j] == 3) {
                 setColour(lightgray);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
-            }
-            else if (map[i][j] > 3)
-            {
+            } else if (map[i][j] > 3) {
                 setColour(yellow);
                 fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
             }
@@ -69,24 +58,19 @@ void displayBlocksAndGoals(int **map)
 }
 
 
-void drawGrid()
-{
+void drawGrid() {
     background();
     setColour(black);
-    for (int i = 0; i < DIMENSIONS; i++)
-    {
-        for (int j = 0; j < DIMENSIONS; j++)
-        {
+    for (int i = 0; i < DIMENSIONS; i++) {
+        for (int j = 0; j < DIMENSIONS; j++) {
             drawRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
         }
     }
     foreground();
 }
 
-void addMarker(int** map, int x, int y)
-{
-    switch (map[x][y])
-    {
+void addMarker(int** map, int x, int y) {
+    switch (map[x][y]) {
     case 1:
         printf("ERROR: CANNOT PLACE MARKER ON HOME SQUARE\n");
         break;
@@ -101,9 +85,8 @@ void addMarker(int** map, int x, int y)
 
 
 
-void addObstacle(int** map, int x, int y){
-    switch (map[x][y])
-    {
+void addObstacle(int** map, int x, int y) {
+    switch (map[x][y]) {
     case 2:
         map[x][y] = 0;//0 for obstacle
         break;
@@ -118,6 +101,6 @@ void addObstacle(int** map, int x, int y){
     }
 }
 
-void addHome(int** map, int x, int y){
+void addHome(int** map, int x, int y) {
     map[x][y] = 1; //happens before adding obstacles and markers so it doesn't need switch-cases
 }

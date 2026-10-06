@@ -1,7 +1,8 @@
-typedef struct
-{
-    int xP;
-    int yP;
+typedef int Pixel;
+
+typedef struct {
+    Pixel xP;
+    Pixel yP;
     int direction;
     int isCarryingMarker;
 } Robot;
@@ -16,5 +17,5 @@ void goHome(Robot *, char*, int, int**);
 void turnAround(Robot *, int**);
 
 int atMarker(Robot *, int **);
-void initRobot(Robot *, int, int, int);
+void initRobot(Robot *, Pixel, Pixel, int);
 void drawForeground(Robot*, int**);
