@@ -1,4 +1,4 @@
-#define squareSideLength 50
-#define dimensions 10
-#define waitTimeMove 10
-#define waitTimeTurn 5
+#define SQUARE_SIDE_LENGTH 50
+#define DIMENSIONS 10
+#define WAIT_TIME_MOVE 10
+#define WAIT_TIME_TURN 5
