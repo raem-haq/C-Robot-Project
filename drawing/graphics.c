@@ -1,5 +1,41 @@
 #include <stdio.h>
+#include <SDL2/SDL.h>
 #include "graphics.h"
+
+static SDL_Window *window = NULL;
+static SDL_Renderer *renderer = NULL;
+static SDL_Color currentColour = { 0, 0, 0, 255 };
+
+static void initialiseSDL(void) {
+  if (window != NULL && renderer != NULL) {
+    return;
+  }
+
+  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    fprintf(stderr, "ERROR: SDL initialization failed: %s\n", SDL_GetError());
+    exit(1);
+  }
+
+  window = SDL_CreateWindow("C Robot Project",
+                            SDL_WINDOWPOS_CENTERED,
+                            SDL_WINDOWPOS_CENTERED,
+                            800,
+                            600,
+                            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+  if (window == NULL) {
+    fprintf(stderr, "ERROR: Unable to create SDL window: %s\n", SDL_GetError());
+    SDL_Quit();
+    exit(1);
+  }
+
+  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+  if (renderer == NULL) {
+    fprintf(stderr, "ERROR: Unable to create SDL renderer: %s\n", SDL_GetError());
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    exit(1);
+  }
+}
 
 void drawLine(int x1, int x2, int x3, int x4) {
   printf("DL %i %i %i %i\n", x1, x2, x3, x4);
