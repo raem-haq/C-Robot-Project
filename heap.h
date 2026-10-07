@@ -1,4 +1,4 @@
-#ifndef PRIORITY_QUEUE_H
+#ifndef MINHEAP_H
 #define MINHEAP_H
 
 #include <stddef.h>
@@ -13,9 +13,9 @@ typedef struct {
     CompareFn compare;
 } MinHeap;
 
-void heap_init(MinHeap*, int);
+void heap_init(MinHeap *heap, int capacity, size_t elementSize, CompareFn compare);
 void heap_push(MinHeap*, const void*);
-void heap_pop(MinHeap*) ;
+void heap_pop(MinHeap*, void *result);
 int heap_empty(MinHeap*);
 void heap_free(MinHeap*);
 

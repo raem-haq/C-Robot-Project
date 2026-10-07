@@ -1,4 +1,4 @@
-#include "priorityQueue.h"
+#include "heap.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -16,10 +16,12 @@ static void *heap_element(MinHeap *heap, int index) {
     return (char *)heap->data + (size_t)index * heap->elementSize;
 }
 
-void heap_init(MinHeap *heap, int capacity) {
+void heap_init(MinHeap *heap, int capacity, size_t elementSize, CompareFn compare) {
     heap->data = NULL;
     heap->size = 0;
     heap->capacity = 0;
+    heap->elementSize = elementSize;
+    heap->compare = compare;
 
     if (heap->elementSize == 0 || heap->compare == NULL || capacity < 0) {
         heap_error(heap, "Heap requires an element size, comparator, and nonnegative capacity");
@@ -87,9 +89,12 @@ void heap_push(MinHeap *heap, const void *element) {
     free(elementCopy);
 }
 
-void heap_pop(MinHeap *heap) {
+void heap_pop(MinHeap *heap, void *result) {
     if (heap->size == 0) {
         heap_error(heap, "Cannot pop from an empty heap");
+    }
+    if (result != NULL) {
+        memcpy(result, heap->data, heap->elementSize);
     }
     if (heap->size == 1) {
         heap->size = 0;
