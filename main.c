@@ -44,6 +44,8 @@ void aStarReturn(Robot *robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS], i
                  Point homePosition);
 
 int main(int argc, char** argv) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     KnownCell robotBeliefMap[DIMENSIONS][DIMENSIONS];
     initKnown(robotBeliefMap);
 
