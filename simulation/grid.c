@@ -4,15 +4,14 @@
 #include <string.h>
 #include "../constants.h"
 
-void displayBlocksAndGoals(int **);
+void displayBlocksAndGoals(int [DIMENSIONS][DIMENSIONS]);
 void drawGrid(void);
 
-int** initGrid(void);
+void initGrid(int [DIMENSIONS][DIMENSIONS]);
 
-void addObstacle(int**, int, int);
-void addMarker(int**, int, int);
-void freeMap(int**);
-void addHome(int**, int, int);
+void addObstacle(int [DIMENSIONS][DIMENSIONS], int, int);
+void addMarker(int [DIMENSIONS][DIMENSIONS], int, int);
+void addHome(int [DIMENSIONS][DIMENSIONS], int, int);
 
 /*
 map[x][y] -- meaning
@@ -21,14 +20,12 @@ map[x][y] -- meaning
 0 -- obstacle
 3+ -- 1+ marker
 */
-int** initGrid(void) {
-    int** map[DIMENSIONS][DIMENSIONS];
+void initGrid(int map[DIMENSIONS][DIMENSIONS]) {
     for (int i = 0; i < DIMENSIONS; i++) {
         for (int j = 0; j < DIMENSIONS; j++) {
             map[i][j] = 2;
         }
     }
-    return map;
 }
 /*
 map[x][y] -- meaning -- colour
@@ -37,7 +34,7 @@ map[x][y] -- meaning -- colour
 1 -- home -- green
 0 -- obstacle -- black
 */
-void displayBlocksAndGoals(int **map) {
+void displayBlocksAndGoals(int map[DIMENSIONS][DIMENSIONS]) {
     for (int i = 0; i < DIMENSIONS; i++) {
         for (int j = 0; j < DIMENSIONS; j++) {
             if (map[i][j] == 1) {
@@ -69,7 +66,7 @@ void drawGrid() {
     foreground();
 }
 
-void addMarker(int** map, int x, int y) {
+void addMarker(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
     switch (map[x][y]) {
     case 1:
         printf("ERROR: CANNOT PLACE MARKER ON HOME SQUARE\n");
@@ -85,7 +82,7 @@ void addMarker(int** map, int x, int y) {
 
 
 
-void addObstacle(int** map, int x, int y) {
+void addObstacle(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
     switch (map[x][y]) {
         case 2:
             map[x][y] = 0;//0 for obstacle
@@ -101,6 +98,6 @@ void addObstacle(int** map, int x, int y) {
     }
 }
 
-void addHome(int** map, int x, int y) {
+void addHome(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
     map[x][y] = 1; //happens before adding obstacles and markers so it doesn't need switch-cases
 }

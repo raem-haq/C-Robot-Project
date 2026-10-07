@@ -1,3 +1,8 @@
+#ifndef ROBOT_H
+#define ROBOT_H
+
+#include "../constants.h"
+
 typedef int Pixel;
 
 typedef struct {
@@ -9,13 +14,15 @@ typedef struct {
 
 void drawRobot(Robot *);
 
-int canForward(Robot *, int **);
-void left(Robot *, int**);
-void right(Robot *, int**);
-void forward(Robot *, int**);
-void goHome(Robot *, char*, int, int**);
-void turnAround(Robot *, int**);
+int canForward(Robot *, int [DIMENSIONS][DIMENSIONS]);
+void left(Robot *, int [DIMENSIONS][DIMENSIONS]);
+void right(Robot *, int [DIMENSIONS][DIMENSIONS]);
+void forward(Robot *, int [DIMENSIONS][DIMENSIONS]);
+void goHome(Robot *, char*, int, int [DIMENSIONS][DIMENSIONS]);
+void turnAround(Robot *, int [DIMENSIONS][DIMENSIONS]);
 
-int atMarker(Robot *, int **);
+int atMarker(Robot *, int [DIMENSIONS][DIMENSIONS]);
 void initRobot(Robot *, Pixel, Pixel, int);
-void drawForeground(Robot*, int**);
+void drawForeground(Robot*, int [DIMENSIONS][DIMENSIONS]);
+
+#endif

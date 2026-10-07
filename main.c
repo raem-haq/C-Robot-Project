@@ -7,12 +7,7 @@
 #include "constants.h"
 #include <stdbool.h>
 #include "heap.h"
-
-void addToMoveStack(char**, char, int*, int*);
-void DFS(Robot*, int[DIMENSIONS][DIMENSIONS], KnownCell[DIMENSIONS][DIMENSIONS], int*, char**, int*);
-void comeBack(Robot*, char*, int, int**);
-void initVisited(bool[DIMENSIONS][DIMENSIONS]);
-bool loadLocations(int**, const char*, void (*)(int**, int, int));
+#include <limits.h>
 
 typedef enum { UNKNOWN, FREE, BLOCKED } Knowledge;
 
@@ -21,14 +16,39 @@ typedef struct {
     int markers;      // believed marker count, valid once seen
     float cost;       // believed move cost (currently always 1.0)
 } KnownCell;
-void initKnown(KnownCell[DIMENSIONS][DIMENSIONS]);
 
+typedef struct {
+    int row;
+    int col;
+} Point;
+
+void addToMoveStack(char**, char, int*, int*);
+void DFS(Robot*, int [DIMENSIONS][DIMENSIONS], KnownCell[DIMENSIONS][DIMENSIONS], Point, int*, char**, int*);
+void comeBack(Robot*, char*, int, int [DIMENSIONS][DIMENSIONS]);
+void initVisited(bool[DIMENSIONS][DIMENSIONS]);
+bool loadLocations(int [DIMENSIONS][DIMENSIONS], const char*, void (*)(int [DIMENSIONS][DIMENSIONS], int, int));
+
+typedef struct {
+    Point point;
+    int g;
+    int f;
+} Node;
+
+void initKnown(KnownCell[DIMENSIONS][DIMENSIONS]);
+int compare_nodes(const void *a, const void *b);
+int heuristic(Point a, Point b);
+bool in_bounds(int row, int col);
+bool aStar(Robot *robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int groundTruthMap[DIMENSIONS][DIMENSIONS],
+           Point homePosition, char *moves, int *moveCount);
+void aStarReturn(Robot *robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                 Point homePosition);
 
 int main(int argc, char** argv) {
     KnownCell robotBeliefMap[DIMENSIONS][DIMENSIONS];
     initKnown(robotBeliefMap);
 
-    int** groundTruthMap = initGrid();
+    int groundTruthMap[DIMENSIONS][DIMENSIONS];
+    initGrid(groundTruthMap);
     
     int homeX = 0;
     int homeY = 0;
@@ -79,7 +99,8 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     
-    DFS(robotPtr, groundTruthMap, robotBeliefMap, &noOfMoves, &moveStack, &length);
+    Point homePosition = {homeY, homeX};
+    DFS(robotPtr, groundTruthMap, robotBeliefMap, homePosition, &noOfMoves, &moveStack, &length);
     //the robot stops at a random place, but I want to go to the home square
     goHome(robotPtr, moveStack, noOfMoves, groundTruthMap);
 
@@ -89,7 +110,8 @@ int main(int argc, char** argv) {
 }
 
 
-bool loadLocations(int** map, const char* filePath, void (*addLocation)(int**, int, int)) {
+bool loadLocations(int map[DIMENSIONS][DIMENSIONS], const char* filePath,
+                   void (*addLocation)(int [DIMENSIONS][DIMENSIONS], int, int)) {
     FILE *file = fopen(filePath, "r");
     if (file == NULL) {
         fprintf(stderr, "ERROR: Could not open %s\n", filePath);
@@ -134,7 +156,7 @@ void addToMoveStack(char** moveStack, char move, int* noOfMoves, int* length) {
 
 
 //this procedure is to come back to a square which had/has a marker after you've gone to the home square
-void comeBack(Robot *robotPtr, char* moveStack, int noOfMoves, int** groundTruthMap) {
+void comeBack(Robot *robotPtr, char* moveStack, int noOfMoves, int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
     char instruct;
     turnAround(robotPtr, groundTruthMap);
     for (int i = 0; i < noOfMoves; i++) {
@@ -163,13 +185,13 @@ void initVisited(bool visited[DIMENSIONS][DIMENSIONS]) {
     }
 }
 
-int shouldGoForward(Robot* robotPtr, int** groundTruthMap, KnownCell beliefMap[DIMENSIONS][DIMENSIONS]) {
+int shouldGoForward(Robot* robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                   KnownCell beliefMap[DIMENSIONS][DIMENSIONS]) {
     // you should go forward if you can go forward AND you have NOT visited the square in front 
     int x = robotPtr->xP/SQUARE_SIDE_LENGTH;
     int y = robotPtr->yP/SQUARE_SIDE_LENGTH;
     int result = canForward(robotPtr, groundTruthMap);
     if (result) {
-        int haveVisited;
         switch (robotPtr->direction) {
             case 0:
                 return beliefMap[x][y - 1].state == UNKNOWN;
@@ -187,7 +209,7 @@ int shouldGoForward(Robot* robotPtr, int** groundTruthMap, KnownCell beliefMap[D
 }
 
 
-void backOne(Robot* robotPtr, char* moveStack, int* noOfMoves, int** groundTruthMap) {
+void backOne(Robot* robotPtr, char* moveStack, int* noOfMoves, int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
     int haveMovedBack = 0;
     char instruct;
     //reverse all the instructions until you've gone back
@@ -213,88 +235,197 @@ void backOne(Robot* robotPtr, char* moveStack, int* noOfMoves, int** groundTruth
     turnAround(robotPtr, groundTruthMap);//turn around so you face the same direction
 }
 
-void updateBeliefMap(KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int groundTruthMap[DIMENSIONS][DIMENSIONS], int x, int y){
-    beliefMap[x][y] = (KnownCell){groundTruthMap[x][y] == 2 ? BLOCKED : FREE, groundTruthMap[x][y] >= 3 ? groundTruthMap[x][y] - 2 : 0,  1.0f};
+void updateBeliefMap(KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int groundTruthMap[DIMENSIONS][DIMENSIONS], int x, int y) {
+    beliefMap[x][y] = (KnownCell){groundTruthMap[x][y] == 2 ? BLOCKED : FREE,
+                                 groundTruthMap[x][y] >= 3 ? groundTruthMap[x][y] - 2 : 0,
+                                 1.0f};
 }
 
-void DFS(Robot* robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS], 
-            KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int* noOfMoves, char** moveStack, int* length) {
-    int x = robotPtr->xP/SQUARE_SIDE_LENGTH;
-    int y = robotPtr->yP/SQUARE_SIDE_LENGTH;
+void DFS(Robot* robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+            KnownCell beliefMap[DIMENSIONS][DIMENSIONS], Point homePosition,
+            int* noOfMoves, char** moveStack, int* length) {
+    int x = robotPtr->xP / SQUARE_SIDE_LENGTH;
+    int y = robotPtr->yP / SQUARE_SIDE_LENGTH;
     updateBeliefMap(beliefMap, groundTruthMap, x, y);
     if (atMarker(robotPtr, groundTruthMap)) {
-        int noMarkersAtSquare = groundTruthMap[x][y] - 2;//3+ means there are markers at that square
-        for (int i = 0; i<noMarkersAtSquare;i++) {
+        int noMarkersAtSquare = groundTruthMap[x][y] - 2;
+        for (int i = 0; i < noMarkersAtSquare; i++) {
             robotPtr->isCarryingMarker = 1;
             --groundTruthMap[x][y];
-            aStarReturn(robotPtr, beliefMap);
-            robotPtr->isCarryingMarker = 0;//drop the marker
-            comeBack(robotPtr, *moveStack, *noOfMoves, groundTruthMap);// and come back to this square
+            aStarReturn(robotPtr, beliefMap, groundTruthMap, homePosition);
+            robotPtr->isCarryingMarker = 0;
+            comeBack(robotPtr, *moveStack, *noOfMoves, groundTruthMap);
         }
     }
-        //loop 4 times for each direction
-        for (int i = 0; i< 4; i++) {
-            if (shouldGoForward(robotPtr, groundTruthMap, beliefMap)) {
-                //keep recursing until you can't/shouldn't go forwards, e.g., if there is no unvisited squares
-                forward(robotPtr, groundTruthMap);
-                addToMoveStack(moveStack, 'F', noOfMoves, length);
-                DFS(robotPtr, groundTruthMap, beliefMap, noOfMoves, moveStack, length);//keep recursing
-                backOne(robotPtr, *moveStack, noOfMoves, groundTruthMap);
-            }
-            left(robotPtr, groundTruthMap);
-            addToMoveStack(moveStack, 'L', noOfMoves, length);
+    for (int i = 0; i < 4; i++) {
+        if (shouldGoForward(robotPtr, groundTruthMap, beliefMap)) {
+            forward(robotPtr, groundTruthMap);
+            addToMoveStack(moveStack, 'F', noOfMoves, length);
+            DFS(robotPtr, groundTruthMap, beliefMap, homePosition, noOfMoves, moveStack, length);
+            backOne(robotPtr, *moveStack, noOfMoves, groundTruthMap);
         }
+        left(robotPtr, groundTruthMap);
+        addToMoveStack(moveStack, 'L', noOfMoves, length);
+    }
 }
 
-typedef struct {
-    int row;
-    int col;
-} Point;
-
-typedef struct {
-    Point point;
-    int g;  // cost from start
-    int f;  // g + heuristic
-} Node;
-
-void aStarReturn(Robot* robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS]) {
-    return;
-}
-
-typedef struct {
-    int row;
-    int col;
-} Point;
-
-typedef struct {
-    Point point;
-    int g;
-    int f;
-} Node;
-
-int compare_nodes(const void *a, const void *b)
-{
+int compare_nodes(const void *a, const void *b) {
     const Node *nodeA = a;
     const Node *nodeB = b;
 
-    if (nodeA->f < nodeB->f)
+    if (nodeA->f < nodeB->f) {
         return -1;
-
-    if (nodeA->f > nodeB->f)
+    }
+    if (nodeA->f > nodeB->f) {
         return 1;
-
+    }
     return 0;
 }
 
-
-
-void aStar(KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int homeX, int homeY) {
-    MinHeap openSet;
-
-    heap_init(&openSet, 100, sizeof(Node), compare_nodes);
-    
+int heuristic(Point a, Point b) {
+    return abs(a.row - b.row) + abs(a.col - b.col);
 }
 
+bool in_bounds(int row, int col) {
+    return row >= 0 && row < DIMENSIONS && col >= 0 && col < DIMENSIONS;
+}
+
+bool aStar(Robot *robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS],
+           int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition,
+           char *moves, int *moveCount) {
+    Point start = {
+        robotPtr->yP / SQUARE_SIDE_LENGTH,
+        robotPtr->xP / SQUARE_SIDE_LENGTH
+    };
+    int gScore[DIMENSIONS][DIMENSIONS];
+    Point parent[DIMENSIONS][DIMENSIONS];
+    bool inOpenSet[DIMENSIONS][DIMENSIONS] = {{false}};
+    MinHeap openSet;
+    Node current;
+    Node next;
+    int neighborRow[] = {-1, 0, 1, 0};
+    int neighborCol[] = {0, 1, 0, -1};
+
+    for (int row = 0; row < DIMENSIONS; row++) {
+        for (int col = 0; col < DIMENSIONS; col++) {
+            gScore[row][col] = INT_MAX;
+            parent[row][col] = (Point){-1, -1};
+        }
+    }
+
+    gScore[start.row][start.col] = 0;
+    heap_init(&openSet, DIMENSIONS * DIMENSIONS, sizeof(Node), compare_nodes);
+    next.point = start;
+    next.g = 0;
+    next.f = heuristic(start, homePosition);
+    heap_push(&openSet, &next);
+    inOpenSet[start.row][start.col] = true;
+
+    while (!heap_empty(&openSet)) {
+        heap_pop(&openSet, &current);
+        inOpenSet[current.point.row][current.point.col] = false;
+
+        if (current.point.row == homePosition.row && current.point.col == homePosition.col) {
+            Point routePoint = current.point;
+            int pathLength = 0;
+            Point path[DIMENSIONS * DIMENSIONS];
+
+            while (routePoint.row != -1 && routePoint.col != -1) {
+                path[pathLength++] = routePoint;
+                routePoint = parent[routePoint.row][routePoint.col];
+            }
+
+            for (int i = pathLength - 1; i > 0; i--) {
+                int rowDelta = path[i].row - path[i - 1].row;
+                int colDelta = path[i].col - path[i - 1].col;
+                if (rowDelta == -1 && colDelta == 0) {
+                    moves[(*moveCount)++] = 'N';
+                } else if (rowDelta == 0 && colDelta == 1) {
+                    moves[(*moveCount)++] = 'E';
+                } else if (rowDelta == 1 && colDelta == 0) {
+                    moves[(*moveCount)++] = 'S';
+                } else if (rowDelta == 0 && colDelta == -1) {
+                    moves[(*moveCount)++] = 'W';
+                }
+            }
+
+            heap_free(&openSet);
+            return true;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            int row = current.point.row + neighborRow[i];
+            int col = current.point.col + neighborCol[i];
+            int tentativeG;
+
+            if (!in_bounds(row, col) || groundTruthMap[col][row] == 0) {
+                continue;
+            }
+            if (beliefMap[col][row].state == BLOCKED) {
+                continue;
+            }
+
+            tentativeG = current.g + 1;
+            if (tentativeG < gScore[row][col]) {
+                gScore[row][col] = tentativeG;
+                parent[row][col] = current.point;
+                next.point = (Point){row, col};
+                next.g = tentativeG;
+                next.f = tentativeG + heuristic((Point){row, col}, homePosition);
+                if (!inOpenSet[row][col]) {
+                    heap_push(&openSet, &next);
+                    inOpenSet[row][col] = true;
+                }
+            }
+        }
+    }
+
+    heap_free(&openSet);
+    return false;
+}
+
+void aStarReturn(Robot *robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS],
+                 int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition) {
+    char moves[DIMENSIONS * DIMENSIONS];
+    int moveCount = 0;
+    int direction = robotPtr->direction;
+
+    if (!aStar(robotPtr, beliefMap, groundTruthMap, homePosition, moves, &moveCount)) {
+        return;
+    }
+
+    for (int i = 0; i < moveCount; i++) {
+        int requiredDirection;
+        switch (moves[i]) {
+            case 'N':
+                requiredDirection = 0;
+                break;
+            case 'E':
+                requiredDirection = 1;
+                break;
+            case 'S':
+                requiredDirection = 2;
+                break;
+            case 'W':
+                requiredDirection = 3;
+                break;
+            default:
+                continue;
+        }
+
+        int turnCount = (requiredDirection - direction + 4) % 4;
+        if (turnCount == 1) {
+            right(robotPtr, groundTruthMap);
+        } else if (turnCount == 2) {
+            right(robotPtr, groundTruthMap);
+            right(robotPtr, groundTruthMap);
+        } else if (turnCount == 3) {
+            left(robotPtr, groundTruthMap);
+        }
+        direction = requiredDirection;
+        forward(robotPtr, groundTruthMap);
+    }
+}
 
 void initKnown(KnownCell belief[DIMENSIONS][DIMENSIONS]) {
     for (int i = 0; i< DIMENSIONS; i++) {

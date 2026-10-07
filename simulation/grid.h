@@ -1,7 +1,13 @@
-void displayBlocksAndGoals(int **);
+#ifndef GRID_H
+#define GRID_H
+
+#include "../constants.h"
+
+void displayBlocksAndGoals(int [DIMENSIONS][DIMENSIONS]);
 void drawGrid(void);
-int** initGrid(void);
-void addObstacle(int**, int, int);
-void addMarker(int**, int, int);
-void addHome(int**, int, int);
-void freeMap(int**);
+void initGrid(int [DIMENSIONS][DIMENSIONS]);
+void addObstacle(int [DIMENSIONS][DIMENSIONS], int, int);
+void addMarker(int [DIMENSIONS][DIMENSIONS], int, int);
+void addHome(int [DIMENSIONS][DIMENSIONS], int, int);
+
+#endif
