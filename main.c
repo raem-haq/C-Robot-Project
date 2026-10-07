@@ -6,6 +6,7 @@
 #include "simulation/grid.h"
 #include "constants.h"
 #include <stdbool.h>
+#include "heap.h"
 
 void addToMoveStack(char**, char, int*, int*);
 void DFS(Robot*, int[DIMENSIONS][DIMENSIONS], KnownCell[DIMENSIONS][DIMENSIONS], int*, char**, int*);
@@ -259,6 +260,41 @@ typedef struct {
 void aStarReturn(Robot* robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS]) {
     return;
 }
+
+typedef struct {
+    int row;
+    int col;
+} Point;
+
+typedef struct {
+    Point point;
+    int g;
+    int f;
+} Node;
+
+int compare_nodes(const void *a, const void *b)
+{
+    const Node *nodeA = a;
+    const Node *nodeB = b;
+
+    if (nodeA->f < nodeB->f)
+        return -1;
+
+    if (nodeA->f > nodeB->f)
+        return 1;
+
+    return 0;
+}
+
+
+
+void aStar(KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int homeX, int homeY) {
+    MinHeap openSet;
+
+    heap_init(&openSet, 100, sizeof(Node), compare_nodes);
+    
+}
+
 
 void initKnown(KnownCell belief[DIMENSIONS][DIMENSIONS]) {
     for (int i = 0; i< DIMENSIONS; i++) {
