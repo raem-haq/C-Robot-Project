@@ -107,6 +107,7 @@ int main(int argc, char** argv) {
     goHome(robotPtr, moveStack, noOfMoves, groundTruthMap);
 
     free(moveStack);
+    waitForClose();
 
     return 0;
 }

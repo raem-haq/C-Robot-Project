@@ -23,4 +23,4 @@ void clear(void);
 void setWindowSize(int, int);
 
 void sleep(int);
-
+void waitForClose(void);

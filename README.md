@@ -6,17 +6,28 @@ My traversal algorithm is based on DFS. I don't check the number of markers on t
 
 ## running the program
 
-To compile, you should write the following command:
+Install the SDL2 development package and `pkg-config`, then compile from the
+project directory:
 
-```gcc -o courseWork main.c drawing/graphics.c simulation/robot.c simulation/grid.c```
+```sh
+gcc -Wall -Wextra -o courseWork main.c drawing/graphics.c simulation/robot.c \
+  simulation/grid.c heap.c $(pkg-config --cflags --libs sdl2) -lm
+```
 
-now to execute the program, on windows, do the following,
+Run it directly; the SDL2 window closes when you press Escape or its close
+button. The graphics adapter includes a small bitmap font and loads BMP images
+through SDL2:
 
-```./courseWork | java -jar drawapp-3.0.jar```
+```sh
+./courseWork
+```
 
-or, you also have the option to input your own starting location and direction. For example, if you wanted to start from (9,8) facing east, you can do:
+You can also choose a starting location and direction. For example, to start
+from (9,8) facing east:
 
-```./courseWork 9 8 east | java -jar drawapp-3.0.jar```
+```sh
+./courseWork 9 8 east
+```
 
 You must always put the direction in lowercase. The coordinate system is such that the top left corner is (0,0) and $y$ increases as you go down the screen and $x$ increases as you move right, $x, y$ must be non-negative integers. Also $x, y$ must be strictly less than ```DIMENSIONS``` in ```constants.h```.
 
