@@ -31,26 +31,26 @@ int canForward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     int yC = (robotPtr->yP) / SQUARE_SIDE_LENGTH;
 
     switch (robotPtr->direction) {
-    case 0:
+    case DIRECTION_NORTH:
         result = ((yC - 1) >= 0);//check if you would be in the grid
         if (result) {
             //then check if you would be on an obstacle
             result = (map[xC][yC - 1] != 0);
         }
         break;
-    case 1:
+    case DIRECTION_EAST:
         result = ((xC + 1) < DIMENSIONS);
         if (result) {
             result = (map[xC + 1][yC] != 0);
         }
         break;
-    case 2:
+    case DIRECTION_SOUTH:
         result = ((yC + 1) < DIMENSIONS);
         if (result) {
             result = (map[xC][yC + 1] != 0);
         }
         break;
-    case 3:
+    case DIRECTION_WEST:
         result = ((xC - 1) >= 0);
         if (result) {
             result = (map[xC - 1][yC] != 0);
@@ -67,21 +67,21 @@ int canForward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
 
 void left(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     clear();
-    robotPtr->direction = (robotPtr->direction + 3) % 4;//this will decrement the direction with wrap-around
+    robotPtr->direction = (Direction)((robotPtr->direction + 3) % 4);
     drawForeground(robotPtr, map);
     sleep(WAIT_TIME_TURN);
 }
 
-void initRobot(Robot *robotPtr, Pixel initXP, Pixel initYP, int initD) {
+void initRobot(Robot *robotPtr, Pixel initXP, Pixel initYP, Direction initDirection) {
     robotPtr->xP = initXP;
     robotPtr->yP = initYP;
-    robotPtr->direction = initD;
+    robotPtr->direction = initDirection;
     robotPtr->isCarryingMarker = 0;
 }
 
 void right(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     clear();
-    robotPtr->direction = (robotPtr->direction + 1) % 4;//increment the direction with wrap-around
+    robotPtr->direction = (Direction)((robotPtr->direction + 1) % 4);
     drawForeground(robotPtr, map);
     sleep(WAIT_TIME_TURN);
 }
@@ -110,16 +110,16 @@ void moveDown(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
 
 void forward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     switch (robotPtr->direction) {
-    case 0:
+    case DIRECTION_NORTH:
         moveUp(robotPtr, map);
         break;
-    case 1:
+    case DIRECTION_EAST:
         moveEast(robotPtr, map);
         break;
-    case 2:
+    case DIRECTION_SOUTH:
         moveDown(robotPtr, map);
         break;
-    case 3:
+    case DIRECTION_WEST:
         moveWest(robotPtr, map);
         break;
     }
@@ -136,16 +136,16 @@ void drawRobot(Robot *robotPtr) {
     
     // eyes
     setColour(black);
-    if (robotPtr->direction == 0) {
+    if (robotPtr->direction == DIRECTION_NORTH) {
         fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3 - SQUARE_SIDE_LENGTH / 5, robotPtr->yP + SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
         fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-    } else if (robotPtr->direction == 1) {
+    } else if (robotPtr->direction == DIRECTION_EAST) {
         fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
         fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-    } else if (robotPtr->direction == 2) {
+    } else if (robotPtr->direction == DIRECTION_SOUTH) {
         fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + 2 * SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
         fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + 2 * SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-    } else if (robotPtr->direction == 3) {
+    } else if (robotPtr->direction == DIRECTION_WEST) {
         fillRect(robotPtr->xP, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
         fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
     }

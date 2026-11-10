@@ -10,7 +10,7 @@ Install the SDL2 development package and `pkg-config`, then compile from the
 project directory:
 
 ```sh
-gcc -Wall -Wextra -o courseWork main.c drawing/graphics.c simulation/robot.c \
+gcc -Wall -Wextra -o robot main.c drawing/graphics.c simulation/robot.c \
   simulation/grid.c heap.c $(pkg-config --cflags --libs sdl2) -lm
 ```
 
@@ -19,14 +19,14 @@ button. The graphics adapter includes a small bitmap font and loads BMP images
 through SDL2:
 
 ```sh
-./courseWork
+./robot
 ```
 
 You can also choose a starting location and direction. For example, to start
 from (9,8) facing east:
 
 ```sh
-./courseWork 9 8 east
+./robot 9 8 east
 ```
 
 You must always put the direction in lowercase. The coordinate system is such that the top left corner is (0,0) and $y$ increases as you go down the screen and $x$ increases as you move right, $x, y$ must be non-negative integers. Also $x, y$ must be strictly less than ```DIMENSIONS``` in ```constants.h```.

@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     int homeX = 0;
     int homeY = 0;
     char *typedDirection = "east";
-    char initDir = 1;
+    Direction initDir = DIRECTION_EAST;
 
     if (argc == 4) {
         homeX = atoi(argv[1]);
@@ -64,13 +64,13 @@ int main(int argc, char** argv) {
     }
 
     if (strcmp(typedDirection,"north")==0) {
-        initDir = 0;
+        initDir = DIRECTION_NORTH;
     } else if (strcmp(typedDirection,"east")==0) {
-        initDir = 1;
+        initDir = DIRECTION_EAST;
     } else if (strcmp(typedDirection,"south")==0) {
-        initDir = 2;    
+        initDir = DIRECTION_SOUTH;
     } else if (strcmp(typedDirection,"west")==0) {
-        initDir = 3;
+        initDir = DIRECTION_WEST;
     } // else??
     
     addHome(groundTruthMap, homeX, homeY);
@@ -196,14 +196,14 @@ int shouldGoForward(Robot* robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
     int result = canForward(robotPtr, groundTruthMap);
     if (result) {
         switch (robotPtr->direction) {
-            case 0:
+            case DIRECTION_NORTH:
                 return beliefMap[x][y - 1].state == UNKNOWN;
-            case 1:
+            case DIRECTION_EAST:
                 return beliefMap[x+1][y].state == UNKNOWN;
-            case 2:
+            case DIRECTION_SOUTH:
+                return beliefMap[x][y+1].state == UNKNOWN;
+            case DIRECTION_WEST:
                 return beliefMap[x-1][y].state == UNKNOWN;
-            case 3:
-                return beliefMap[x][y + 1].state == UNKNOWN;
             default:
                 break;
         }
@@ -239,7 +239,7 @@ void backOne(Robot* robotPtr, char* moveStack, int* noOfMoves, int groundTruthMa
 }
 
 void updateBeliefMap(KnownCell beliefMap[DIMENSIONS][DIMENSIONS], int groundTruthMap[DIMENSIONS][DIMENSIONS], int x, int y) {
-    beliefMap[x][y] = (KnownCell){groundTruthMap[x][y] == 2 ? BLOCKED : FREE,
+    beliefMap[x][y] = (KnownCell){groundTruthMap[x][y] == 0 ? BLOCKED : FREE,
                                  groundTruthMap[x][y] >= 3 ? groundTruthMap[x][y] - 2 : 0,
                                  1.0f};
 }
@@ -391,26 +391,26 @@ void aStarReturn(Robot *robotPtr, KnownCell beliefMap[DIMENSIONS][DIMENSIONS],
                  int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition) {
     char moves[DIMENSIONS * DIMENSIONS];
     int moveCount = 0;
-    int direction = robotPtr->direction;
+    Direction direction = robotPtr->direction;
 
     if (!aStar(robotPtr, beliefMap, groundTruthMap, homePosition, moves, &moveCount)) {
         return;
     }
 
     for (int i = 0; i < moveCount; i++) {
-        int requiredDirection;
+        Direction requiredDirection;
         switch (moves[i]) {
             case 'N':
-                requiredDirection = 0;
+                requiredDirection = DIRECTION_NORTH;
                 break;
             case 'E':
-                requiredDirection = 1;
+                requiredDirection = DIRECTION_EAST;
                 break;
             case 'S':
-                requiredDirection = 2;
+                requiredDirection = DIRECTION_SOUTH;
                 break;
             case 'W':
-                requiredDirection = 3;
+                requiredDirection = DIRECTION_WEST;
                 break;
             default:
                 continue;

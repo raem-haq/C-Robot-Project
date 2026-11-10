@@ -5,10 +5,17 @@
 
 typedef int Pixel;
 
+typedef enum {
+    DIRECTION_NORTH,
+    DIRECTION_EAST,
+    DIRECTION_SOUTH,
+    DIRECTION_WEST
+} Direction;
+
 typedef struct {
     Pixel xP;
     Pixel yP;
-    int direction;
+    Direction direction;
     int isCarryingMarker;
 } Robot;
 
@@ -22,7 +29,7 @@ void goHome(Robot *, char*, int, int [DIMENSIONS][DIMENSIONS]);
 void turnAround(Robot *, int [DIMENSIONS][DIMENSIONS]);
 
 int atMarker(Robot *, int [DIMENSIONS][DIMENSIONS]);
-void initRobot(Robot *, Pixel, Pixel, int);
+void initRobot(Robot *, Pixel, Pixel, Direction);
 void drawForeground(Robot*, int [DIMENSIONS][DIMENSIONS]);
 
 #endif
