@@ -145,15 +145,15 @@ bool loadLocations(int map[DIMENSIONS][DIMENSIONS], const char* filePath,
 }
 
 void addToMoveStack(char** moveStack, char move, int* noOfMoves, int* length) {
-    if (*noOfMoves == *length) { //IF the move-array  is full
-        *(length) *= 2;// double the length
-        *moveStack = (char*)realloc(*moveStack, (*length)*sizeof(char));//annd create a new array out of the old array with double the length
+    if (*noOfMoves == *length) {
+        *(length) *= 2;
+        *moveStack = (char*)realloc(*moveStack, (*length)*sizeof(char));
         if (*moveStack == NULL) {
             printf("ERROR: Memory allocation failed of \"*moveStack\" in addToMoveStack\n");
         }
     }
-    *(*moveStack + *noOfMoves) = move;//add the new move to the array
-    ++*(noOfMoves);//increase the number of moves
+    *(*moveStack + *noOfMoves) = move;
+    *(noOfMoves)++;
 }
 
 

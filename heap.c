@@ -125,7 +125,7 @@ void heap_pop(MinHeap *heap, void *result) {
     memcpy(heap_element(heap, index), heap_element(heap, heap->size), heap->elementSize);
 }
 
-int heap_empty(MinHeap *heap) {
+int heap_empty(const MinHeap *heap) {
     return heap->size == 0;
 }
 

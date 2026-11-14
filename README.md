@@ -11,7 +11,8 @@ project directory:
 
 ```sh
 gcc -Wall -Wextra -o robot main.c drawing/graphics.c simulation/robot.c \
-  simulation/grid.c heap.c $(pkg-config --cflags --libs sdl2) -lm
+  simulation/grid.c simulation/planner.c heap.c \
+  $(pkg-config --cflags --libs sdl2) -lm
 ```
 
 Run it directly; the SDL2 window closes when you press Escape or its close

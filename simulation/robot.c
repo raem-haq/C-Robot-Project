@@ -6,17 +6,24 @@
 #include "robot.h"
 #include "../constants.h"
 
-void moveEast(Robot *, int [DIMENSIONS][DIMENSIONS]);
-void moveWest(Robot *, int [DIMENSIONS][DIMENSIONS]);
-void moveUp(Robot *, int [DIMENSIONS][DIMENSIONS]);
-void moveDown(Robot *, int [DIMENSIONS][DIMENSIONS]);
+static void moveOneCell(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS],
+                        Pixel xDirection, Pixel yDirection) {
+    const int steps = 5;
+    Pixel increment = SQUARE_SIDE_LENGTH / steps;
 
+    for (int i = 0; i < steps; i++) {
+        clear();
+        robotPtr->xP += xDirection * increment;
+        robotPtr->yP += yDirection * increment;
+        drawForeground(robotPtr, map);
+        sleep(WAIT_TIME_MOVE);
+    }
+}
 
 int atMarker(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
-
-    int xC = (robotPtr->xP) / SQUARE_SIDE_LENGTH;//convert from pixels to coordinates
-    int yC = (robotPtr->yP) / SQUARE_SIDE_LENGTH;
-    return (map[xC][yC] >= 3);
+    int x = robotPtr->xP / SQUARE_SIDE_LENGTH;
+    int y = robotPtr->yP / SQUARE_SIDE_LENGTH;
+    return map[x][y] >= 3;
 }
 
 void drawForeground(Robot* robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
@@ -86,41 +93,19 @@ void right(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     sleep(WAIT_TIME_TURN);
 }
 
-void moveUp(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
-    int N = 5;
-    Pixel inc = SQUARE_SIDE_LENGTH / N;
-    for (int i = 0; i < N; i++) {
-        clear();
-        robotPtr->yP -= inc;
-        drawForeground(robotPtr, map);
-        sleep(WAIT_TIME_MOVE);
-    }
-}
-
-void moveDown(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
-    int N = 5;
-    Pixel inc = SQUARE_SIDE_LENGTH / N;
-    for (int i = 0; i < N; i++) {
-        clear();
-        robotPtr->yP += inc;
-        drawForeground(robotPtr, map);
-        sleep(WAIT_TIME_MOVE);
-    }
-}
-
 void forward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     switch (robotPtr->direction) {
     case DIRECTION_NORTH:
-        moveUp(robotPtr, map);
+        moveOneCell(robotPtr, map, 0, -1);
         break;
     case DIRECTION_EAST:
-        moveEast(robotPtr, map);
+        moveOneCell(robotPtr, map, 1, 0);
         break;
     case DIRECTION_SOUTH:
-        moveDown(robotPtr, map);
+        moveOneCell(robotPtr, map, 0, 1);
         break;
     case DIRECTION_WEST:
-        moveWest(robotPtr, map);
+        moveOneCell(robotPtr, map, -1, 0);
         break;
     }
 }
@@ -178,26 +163,4 @@ void turnAround(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     //two rights or lefts make you turn around
     right(robotPtr, map);
     right(robotPtr, map);
-}
-
-void moveEast(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
-    int N = 5;
-    Pixel inc = SQUARE_SIDE_LENGTH / N;
-    for (int i = 0; i < N; i++) {
-        clear();
-        robotPtr->xP += inc;
-        drawForeground(robotPtr, map);
-        sleep(WAIT_TIME_MOVE);
-    }
-}
-
-void moveWest(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
-    int N = 5;
-    Pixel inc = SQUARE_SIDE_LENGTH / N;
-    for (int i = 0; i < N; i++) {
-        clear();
-        robotPtr->xP -= inc;
-        drawForeground(robotPtr, map);
-        sleep(WAIT_TIME_MOVE);
-    }
 }
