@@ -6,12 +6,13 @@
 #include "robot.h"
 #include "../constants.h"
 
+static const int STEPS = 1;
+
 static void moveOneCell(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS],
                         Pixel xDirection, Pixel yDirection) {
-    const int steps = 5;
-    Pixel increment = SQUARE_SIDE_LENGTH / steps;
+    Pixel increment = SQUARE_SIDE_LENGTH / STEPS;
 
-    for (int i = 0; i < steps; i++) {
+    for (int i = 0; i < STEPS; i++) {
         clear();
         robotPtr->xP += xDirection * increment;
         robotPtr->yP += yDirection * increment;
@@ -83,7 +84,7 @@ void initRobot(Robot *robotPtr, Pixel initXP, Pixel initYP, Direction initDirect
     robotPtr->xP = initXP;
     robotPtr->yP = initYP;
     robotPtr->direction = initDirection;
-    robotPtr->isCarryingMarker = 0;
+    robotPtr->isCarryingMarker = false;
 }
 
 void right(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
@@ -111,7 +112,7 @@ void forward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
 }
 
 void drawRobot(Robot *robotPtr) {
-    if (robotPtr->isCarryingMarker == 1) {
+    if (robotPtr->isCarryingMarker) {
         setColour(yellow);
     } else {
         setColour(gray);

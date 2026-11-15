@@ -1,6 +1,8 @@
 #ifndef ROBOT_H
 #define ROBOT_H
 
+#include <stdbool.h>
+
 #include "../constants.h"
 
 typedef int Pixel;
@@ -16,7 +18,7 @@ typedef struct {
     Pixel xP;
     Pixel yP;
     Direction direction;
-    int isCarryingMarker;
+    bool isCarryingMarker;
 } Robot;
 
 void drawRobot(Robot *);

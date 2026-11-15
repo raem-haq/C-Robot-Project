@@ -24,8 +24,13 @@ static bool addToMoveStack(char **moveStack, char move, int *moveCount, int *cap
 static bool DFS(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
                 Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point homePosition,
                 int *moveCount, char **moveStack, int *capacity);
-static void comeBack(Robot *robotPtr, char *moveStack, int moveCount,
-                     int groundTruthMap[DIMENSIONS][DIMENSIONS]);
+static void retraceAStarRoute(Robot *robotPtr, const char *moves, int moveCount,
+                              Direction markerDirection,
+                              int groundTruthMap[DIMENSIONS][DIMENSIONS]);
+static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS]);
+static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS]);
 static bool shouldGoForward(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
                             Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
 static void backOne(Robot *robotPtr, char *moveStack, int *moveCount,
@@ -36,8 +41,9 @@ static int heuristic(Point a, Point b);
 static bool inBounds(int x, int y);
 static bool aStar(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
                   Point homePosition, char *moves, int *moveCount);
-static void aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
-                        int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition);
+static bool aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
+                        int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition,
+                        char *moves, int *moveCount);
 static void initKnown(Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
 
 bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
@@ -61,7 +67,7 @@ bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     if (success) {
         goHome(robotPtr, moveStack, moveCount, map);
     } else {
-        fprintf(stderr, "ERROR: Could not grow move stack\n");
+        fprintf(stderr, "ERROR: Exploration failed (could not grow move stack or find a return route)\n");
     }
     free(moveStack);
     return success;
@@ -84,24 +90,49 @@ static bool addToMoveStack(char **moveStack, char move, int *moveCount, int *cap
     return true;
 }
 
-static void comeBack(Robot *robotPtr, char *moveStack, int moveCount,
-                     int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
-    turnAround(robotPtr, groundTruthMap);
-    for (int i = 0; i < moveCount; i++) {
-        switch (moveStack[i]) {
-            case 'F':
-                forward(robotPtr, groundTruthMap);
+static void retraceAStarRoute(Robot *robotPtr, const char *moves, int moveCount,
+                              Direction markerDirection,
+                              int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
+    Direction direction = robotPtr->direction;
+    for (int i = moveCount - 1; i >= 0; i--) {
+        switch (moves[i]) {
+            case 'N':
+                moveInDirection(robotPtr, &direction, DIRECTION_SOUTH, groundTruthMap);
                 break;
-            case 'L':
-                left(robotPtr, groundTruthMap);
+            case 'E':
+                moveInDirection(robotPtr, &direction, DIRECTION_WEST, groundTruthMap);
                 break;
-            case 'R':
-                right(robotPtr, groundTruthMap);
+            case 'S':
+                moveInDirection(robotPtr, &direction, DIRECTION_NORTH, groundTruthMap);
+                break;
+            case 'W':
+                moveInDirection(robotPtr, &direction, DIRECTION_EAST, groundTruthMap);
                 break;
             default:
                 break;
         }
     }
+    turnToDirection(robotPtr, &direction, markerDirection, groundTruthMap);
+}
+
+static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
+    int turnCount = (requiredDirection - *direction + 4) % 4;
+    if (turnCount == 1) {
+        right(robotPtr, groundTruthMap);
+    } else if (turnCount == 2) {
+        right(robotPtr, groundTruthMap);
+        right(robotPtr, groundTruthMap);
+    } else if (turnCount == 3) {
+        left(robotPtr, groundTruthMap);
+    }
+    *direction = requiredDirection;
+}
+
+static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
+    turnToDirection(robotPtr, direction, requiredDirection, groundTruthMap);
+    forward(robotPtr, groundTruthMap);
 }
 
 static bool shouldGoForward(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
@@ -174,11 +205,20 @@ static bool DFS(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
     if (atMarker(robotPtr, groundTruthMap)) {
         int markersAtSquare = groundTruthMap[x][y] - 2;
         for (int i = 0; i < markersAtSquare; i++) {
-            robotPtr->isCarryingMarker = 1;
+            char returnMoves[DIMENSIONS * DIMENSIONS];
+            int returnMoveCount = 0;
+            Direction markerDirection = robotPtr->direction;
+
+            robotPtr->isCarryingMarker = true;
             --groundTruthMap[x][y];
-            aStarReturn(robotPtr, beliefMap, groundTruthMap, homePosition);
-            robotPtr->isCarryingMarker = 0;
-            comeBack(robotPtr, *moveStack, *moveCount, groundTruthMap);
+            if (!aStarReturn(robotPtr, beliefMap, groundTruthMap, homePosition,
+                             returnMoves, &returnMoveCount)) {
+                robotPtr->isCarryingMarker = false;
+                return false;
+            }
+            robotPtr->isCarryingMarker = false;
+            retraceAStarRoute(robotPtr, returnMoves, returnMoveCount, markerDirection,
+                              groundTruthMap);
         }
     }
 
@@ -308,17 +348,16 @@ static bool aStar(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
     return false;
 }
 
-static void aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
-                        int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition) {
-    char moves[DIMENSIONS * DIMENSIONS];
-    int moveCount = 0;
+static bool aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
+                        int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition,
+                        char *moves, int *moveCount) {
     Direction direction = robotPtr->direction;
 
-    if (!aStar(robotPtr, beliefMap, homePosition, moves, &moveCount)) {
-        return;
+    if (!aStar(robotPtr, beliefMap, homePosition, moves, moveCount)) {
+        return false;
     }
 
-    for (int i = 0; i < moveCount; i++) {
+    for (int i = 0; i < *moveCount; i++) {
         Direction requiredDirection;
         switch (moves[i]) {
             case 'N':
@@ -337,18 +376,9 @@ static void aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSI
                 continue;
         }
 
-        int turnCount = (requiredDirection - direction + 4) % 4;
-        if (turnCount == 1) {
-            right(robotPtr, groundTruthMap);
-        } else if (turnCount == 2) {
-            right(robotPtr, groundTruthMap);
-            right(robotPtr, groundTruthMap);
-        } else if (turnCount == 3) {
-            left(robotPtr, groundTruthMap);
-        }
-        direction = requiredDirection;
-        forward(robotPtr, groundTruthMap);
+        moveInDirection(robotPtr, &direction, requiredDirection, groundTruthMap);
     }
+    return true;
 }
 
 static void initKnown(Knowledge beliefMap[DIMENSIONS][DIMENSIONS]) {

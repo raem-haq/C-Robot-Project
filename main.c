@@ -35,7 +35,11 @@ int main(int argc, char** argv) {
         initDir = DIRECTION_SOUTH;
     } else if (strcmp(typedDirection,"west")==0) {
         initDir = DIRECTION_WEST;
-    } // else??
+    } else {
+        fprintf(stderr, "ERROR: invalid direction '%s'. Use north, east, south, or west (lowercase).\n",
+                typedDirection);
+        return EXIT_FAILURE;
+    }
     
     addHome(groundTruthMap, homeX, homeY);
 
