@@ -1,6 +1,7 @@
 #include "planner.h"
 
 #include <limits.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -20,325 +21,260 @@ typedef struct {
     int f;
 } Node;
 
-static bool addToMoveStack(char **moveStack, char move, int *moveCount, int *capacity);
-static bool DFS(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point homePosition,
-                int *moveCount, char **moveStack, int *capacity);
-static void retraceAStarRoute(Robot *robotPtr, const char *moves, int moveCount,
-                              Direction markerDirection,
-                              int groundTruthMap[DIMENSIONS][DIMENSIONS]);
-static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
-                            int groundTruthMap[DIMENSIONS][DIMENSIONS]);
-static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
-                            int groundTruthMap[DIMENSIONS][DIMENSIONS]);
-static bool shouldGoForward(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                            Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
-static void backOne(Robot *robotPtr, char *moveStack, int *moveCount,
-                    int groundTruthMap[DIMENSIONS][DIMENSIONS]);
-static void updateBeliefMap(Knowledge beliefMap[DIMENSIONS][DIMENSIONS], int x, int y);
+typedef struct {
+    Point previous;
+    Direction moveDirection;
+    bool hasPrevious;
+} Parent;
+
+static const int directionX[] = {0, 1, 0, -1};
+static const int directionY[] = {-1, 0, 1, 0};
+
 static int compareNodes(const void *a, const void *b);
 static int heuristic(Point a, Point b);
 static bool inBounds(int x, int y);
-static bool aStar(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
-                  Point homePosition, char *moves, int *moveCount);
-static bool aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
-                        int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition,
-                        char *moves, int *moveCount);
+static bool samePoint(Point a, Point b);
+static Point robotPosition(const Robot *robotPtr);
+static void observe(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                   Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
+static int countVisibleUnknown(Point point, Direction direction,
+                               Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
+static bool aStarRoute(Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point start, Point goal,
+                       Direction *moveDirections, int *moveCount);
+static bool selectFrontier(Robot *robotPtr,
+                           Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
+                           Direction *moveDirections, int *moveCount,
+                           Direction *finalDirection);
+static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                            Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
+static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                            Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
+static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                         Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
+                         const Direction *moveDirections, int moveCount,
+                         bool alignFinalDirection, Direction finalDirection,
+                         bool stopAtMarker);
+static bool deliverMarkers(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                           Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point homePosition);
 static void initKnown(Knowledge beliefMap[DIMENSIONS][DIMENSIONS]);
 
+// Inspired by Yamauchi’s frontier-based exploration work
 bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     Knowledge beliefMap[DIMENSIONS][DIMENSIONS];
-    initKnown(beliefMap);
-
-    int moveCount = 0;
-    int capacity = DIMENSIONS;
-    char *moveStack = malloc((size_t)capacity * sizeof(*moveStack));
-    if (moveStack == NULL) {
-        fprintf(stderr, "ERROR: Could not allocate move stack\n");
-        return false;
-    }
-
+    Direction moveDirections[DIMENSIONS * DIMENSIONS];
     Point homePosition = {
         robotPtr->xP / SQUARE_SIDE_LENGTH,
         robotPtr->yP / SQUARE_SIDE_LENGTH
     };
-    bool success = DFS(robotPtr, map, beliefMap, homePosition,
-                       &moveCount, &moveStack, &capacity);
-    if (success) {
-        goHome(robotPtr, moveStack, moveCount, map);
-    } else {
-        fprintf(stderr, "ERROR: Exploration failed (could not grow move stack or find a return route)\n");
-    }
-    free(moveStack);
-    return success;
-}
 
-static bool addToMoveStack(char **moveStack, char move, int *moveCount, int *capacity) {
-    if (*moveCount == *capacity) {
-        if (*capacity > INT_MAX / 2) {
-            return false;
-        }
-        int newCapacity = *capacity * 2;
-        char *newStack = realloc(*moveStack, (size_t)newCapacity * sizeof(**moveStack));
-        if (newStack == NULL) {
-            return false;
-        }
-        *moveStack = newStack;
-        *capacity = newCapacity;
-    }
-    (*moveStack)[(*moveCount)++] = move;
-    return true;
-}
+    initKnown(beliefMap);
+    observe(robotPtr, map, beliefMap);
 
-static void retraceAStarRoute(Robot *robotPtr, const char *moves, int moveCount,
-                              Direction markerDirection,
-                              int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
-    Direction direction = robotPtr->direction;
-    for (int i = moveCount - 1; i >= 0; i--) {
-        switch (moves[i]) {
-            case 'N':
-                moveInDirection(robotPtr, &direction, DIRECTION_SOUTH, groundTruthMap);
-                break;
-            case 'E':
-                moveInDirection(robotPtr, &direction, DIRECTION_WEST, groundTruthMap);
-                break;
-            case 'S':
-                moveInDirection(robotPtr, &direction, DIRECTION_NORTH, groundTruthMap);
-                break;
-            case 'W':
-                moveInDirection(robotPtr, &direction, DIRECTION_EAST, groundTruthMap);
-                break;
-            default:
-                break;
-        }
-    }
-    turnToDirection(robotPtr, &direction, markerDirection, groundTruthMap);
-}
-
-static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
-                            int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
-    int turnCount = (requiredDirection - *direction + 4) % 4;
-    if (turnCount == 1) {
-        right(robotPtr, groundTruthMap);
-    } else if (turnCount == 2) {
-        right(robotPtr, groundTruthMap);
-        right(robotPtr, groundTruthMap);
-    } else if (turnCount == 3) {
-        left(robotPtr, groundTruthMap);
-    }
-    *direction = requiredDirection;
-}
-
-static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
-                            int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
-    turnToDirection(robotPtr, direction, requiredDirection, groundTruthMap);
-    forward(robotPtr, groundTruthMap);
-}
-
-static bool shouldGoForward(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                            Knowledge beliefMap[DIMENSIONS][DIMENSIONS]) {
-    int x = robotPtr->xP / SQUARE_SIDE_LENGTH;
-    int y = robotPtr->yP / SQUARE_SIDE_LENGTH;
-    int nextX = x;
-    int nextY = y;
-
-    switch (robotPtr->direction) {
-        case DIRECTION_NORTH:
-            --nextY;
-            break;
-        case DIRECTION_EAST:
-            ++nextX;
-            break;
-        case DIRECTION_SOUTH:
-            ++nextY;
-            break;
-        case DIRECTION_WEST:
-            --nextX;
-            break;
-        default:
-            return false;
-    }
-
-    if (!canForward(robotPtr, groundTruthMap)) {
-        if (inBounds(nextX, nextY)) {
-            beliefMap[nextX][nextY] = BLOCKED;
-        }
-        return false;
-    }
-    return beliefMap[nextX][nextY] == UNKNOWN;
-}
-
-static void backOne(Robot *robotPtr, char *moveStack, int *moveCount,
-                    int groundTruthMap[DIMENSIONS][DIMENSIONS]) {
-    turnAround(robotPtr, groundTruthMap);
     while (true) {
-        switch (moveStack[*moveCount - 1]) {
-            case 'F':
-                forward(robotPtr, groundTruthMap);
-                --*moveCount;
-                turnAround(robotPtr, groundTruthMap);
-                return;
-            case 'L':
-                right(robotPtr, groundTruthMap);
-                break;
-            case 'R':
-                left(robotPtr, groundTruthMap);
-                break;
-            default:
-                break;
-        }
-        --*moveCount;
-    }
-}
+        Point currentPosition = robotPosition(robotPtr);
+        int moveCount = 0;
+        Direction finalDirection = DIRECTION_NORTH;
 
-static void updateBeliefMap(Knowledge beliefMap[DIMENSIONS][DIMENSIONS], int x, int y) {
-    beliefMap[x][y] = FREE;
-}
-
-static bool DFS(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point homePosition,
-                int *moveCount, char **moveStack, int *capacity) {
-    int x = robotPtr->xP / SQUARE_SIDE_LENGTH;
-    int y = robotPtr->yP / SQUARE_SIDE_LENGTH;
-    updateBeliefMap(beliefMap, x, y);
-
-    if (atMarker(robotPtr, groundTruthMap)) {
-        int markersAtSquare = groundTruthMap[x][y] - 2;
-        for (int i = 0; i < markersAtSquare; i++) {
-            char returnMoves[DIMENSIONS * DIMENSIONS];
-            int returnMoveCount = 0;
-            Direction markerDirection = robotPtr->direction;
-
-            robotPtr->isCarryingMarker = true;
-            --groundTruthMap[x][y];
-            if (!aStarReturn(robotPtr, beliefMap, groundTruthMap, homePosition,
-                             returnMoves, &returnMoveCount)) {
-                robotPtr->isCarryingMarker = false;
+        if (atMarker(robotPtr, map)) {
+            if (!deliverMarkers(robotPtr, map, beliefMap, homePosition)) {
+                fprintf(stderr, "ERROR: Could not find a known route to deliver a marker\n");
                 return false;
             }
-            robotPtr->isCarryingMarker = false;
-            retraceAStarRoute(robotPtr, returnMoves, returnMoveCount, markerDirection,
-                              groundTruthMap);
+            continue;
         }
-    }
 
-    for (int i = 0; i < 4; i++) {
-        if (shouldGoForward(robotPtr, groundTruthMap, beliefMap)) {
-            forward(robotPtr, groundTruthMap);
-            if (!addToMoveStack(moveStack, 'F', moveCount, capacity) ||
-                !DFS(robotPtr, groundTruthMap, beliefMap, homePosition,
-                     moveCount, moveStack, capacity)) {
-                return false;
-            }
-            backOne(robotPtr, *moveStack, moveCount, groundTruthMap);
+        if (selectFrontier(robotPtr, beliefMap, moveDirections, &moveCount,
+                           &finalDirection)) {
+            executeRoute(robotPtr, map, beliefMap, moveDirections, moveCount,
+                         true, finalDirection, true);
+            continue;
         }
-        left(robotPtr, groundTruthMap);
-        if (!addToMoveStack(moveStack, 'L', moveCount, capacity)) {
+        // if we reach here, there are no more frontiers to explore, since selectFrontier returned false.
+        // We should return home, if we are not already there.
+        if (currentPosition.x == homePosition.x && currentPosition.y == homePosition.y) {
+            return true;
+        }
+
+        if (!aStarRoute(beliefMap, currentPosition, homePosition, moveDirections,
+                        &moveCount)) {
+            fprintf(stderr, "ERROR: Could not find a known route back to the home square\n");
             return false;
         }
+        if (executeRoute(robotPtr, map, beliefMap, moveDirections, moveCount,
+                         false, DIRECTION_NORTH, true)) {
+            continue;
+        }
+        return true;
     }
-    return true;
 }
 
 static int compareNodes(const void *a, const void *b) {
-    const Node *nodeA = a;
+    const Node *nodeA = a; // the heap library uses void pointers, so we need to cast to Node*.
     const Node *nodeB = b;
 
-    if (nodeA->f < nodeB->f) {
-        return -1;
+    if (nodeA->f != nodeB->f) {
+        return nodeA->f < nodeB->f ? -1 : 1;
     }
-    if (nodeA->f > nodeB->f) {
-        return 1;
+    if (nodeA->g != nodeB->g) {
+        return nodeA->g > nodeB->g ? -1 : 1;
+    }
+    if (nodeA->point.x != nodeB->point.x) {
+        return nodeA->point.x < nodeB->point.x ? -1 : 1;
+    }
+    if (nodeA->point.y != nodeB->point.y) {
+        return nodeA->point.y < nodeB->point.y ? -1 : 1;
     }
     return 0;
 }
 
 static int heuristic(Point a, Point b) {
-    return abs(a.x - b.x) + abs(a.y - b.y);
+    return abs(a.x - b.x) + abs(a.y - b.y); // Manhattan distance
 }
 
 static bool inBounds(int x, int y) {
     return x >= 0 && x < DIMENSIONS && y >= 0 && y < DIMENSIONS;
 }
 
-static bool aStar(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
-                  Point homePosition, char *moves, int *moveCount) {
-    Point start = {
-        robotPtr->xP / SQUARE_SIDE_LENGTH,
+static bool samePoint(Point a, Point b) {
+    return a.x == b.x && a.y == b.y;
+}
+
+static Point robotPosition(const Robot *robotPtr) {
+    return (Point){
+        robotPtr->xP / SQUARE_SIDE_LENGTH, // would it be better to just store the robot's position in terms of squares rather than pixels? This would avoid having to do this conversion every time we want to get the robot's position.
         robotPtr->yP / SQUARE_SIDE_LENGTH
     };
+}
+
+static void observe(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                    Knowledge beliefMap[DIMENSIONS][DIMENSIONS]) {
+    Point position = robotPosition(robotPtr);
+    Direction forward = robotPtr->direction;
+    // The direction enum is defined in such a way that this will always give the correct left direction.
+    Direction left = (Direction)((forward + 3) % 4);
+    Direction right = (Direction)((forward + 1) % 4);
+    Point visible[] = {
+        position,
+        {position.x + directionX[forward], position.y + directionY[forward]},
+        {position.x + directionX[left], position.y + directionY[left]},
+        {position.x + directionX[right], position.y + directionY[right]},
+        {position.x + directionX[forward] + directionX[left],
+         position.y + directionY[forward] + directionY[left]},
+        {position.x + directionX[forward] + directionX[right],
+         position.y + directionY[forward] + directionY[right]}
+    };
+
+    for (size_t i = 0; i < sizeof(visible) / sizeof(visible[0]); i++) {
+        int x = visible[i].x;
+        int y = visible[i].y;
+        if (inBounds(x, y)) {
+            beliefMap[x][y] = groundTruthMap[x][y] == 0 ? BLOCKED : FREE;
+        }
+    }
+}
+
+static int countVisibleUnknown(Point point, Direction direction,
+                               Knowledge beliefMap[DIMENSIONS][DIMENSIONS]) {
+    Direction left = (Direction)((direction + 3) % 4);
+    Direction right = (Direction)((direction + 1) % 4);
+    Point visible[] = {
+        {point.x + directionX[direction], point.y + directionY[direction]},
+        {point.x + directionX[left], point.y + directionY[left]},
+        {point.x + directionX[right], point.y + directionY[right]},
+        {point.x + directionX[direction] + directionX[left],
+         point.y + directionY[direction] + directionY[left]},
+        {point.x + directionX[direction] + directionX[right],
+         point.y + directionY[direction] + directionY[right]}
+    };
+    int unknownCount = 0;
+    for (size_t i = 0; i < sizeof(visible) / sizeof(visible[0]); i++) {
+        int x = visible[i].x;
+        int y = visible[i].y;
+        if (inBounds(x, y) && beliefMap[x][y] == UNKNOWN) {
+            unknownCount++;
+        }
+    }
+    return unknownCount;
+}
+
+static bool aStarRoute(Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point start, Point goal,
+                       Direction *moveDirections, int *moveCount) {
     int gScore[DIMENSIONS][DIMENSIONS];
-    Point parent[DIMENSIONS][DIMENSIONS];
+    Parent parent[DIMENSIONS][DIMENSIONS];
+    Direction reverseMoveDirections[DIMENSIONS * DIMENSIONS];
     MinHeap openSet;
     Node current;
     Node next;
-    int neighborX[] = {0, 1, 0, -1};
-    int neighborY[] = {-1, 0, 1, 0};
 
+    *moveCount = 0;
+    if (!inBounds(start.x, start.y) ||
+        !inBounds(goal.x, goal.y) ||
+        beliefMap[start.x][start.y] != FREE ||
+        beliefMap[goal.x][goal.y] != FREE) {
+        return false;
+    }
     for (int x = 0; x < DIMENSIONS; x++) {
         for (int y = 0; y < DIMENSIONS; y++) {
             gScore[x][y] = INT_MAX;
-            parent[x][y] = (Point){-1, -1};
+            parent[x][y].hasPrevious = false;
         }
     }
 
     gScore[start.x][start.y] = 0;
-    heap_init(&openSet, DIMENSIONS * DIMENSIONS, sizeof(Node), compareNodes);
-    next.point = start;
-    next.g = 0;
-    next.f = heuristic(start, homePosition);
+    heap_init(&openSet, DIMENSIONS * DIMENSIONS * 4, sizeof(Node), compareNodes);
+    next = (Node){start, 0, heuristic(start, goal)};
     heap_push(&openSet, &next);
 
     while (!heap_empty(&openSet)) {
         heap_pop(&openSet, &current);
-        if (current.g != gScore[current.point.x][current.point.y]) {
+        Point currentPoint = current.point;
+        if (current.g != gScore[currentPoint.x][currentPoint.y]) {
             continue;
         }
 
-        if (current.point.x == homePosition.x && current.point.y == homePosition.y) {
-            Point routePoint = current.point;
-            int pathLength = 0;
-            Point path[DIMENSIONS * DIMENSIONS];
-
-            while (routePoint.x != -1 && routePoint.y != -1) {
-                path[pathLength++] = routePoint;
-                routePoint = parent[routePoint.x][routePoint.y];
-            }
-
-            for (int i = pathLength - 1; i > 0; i--) {
-                int xDelta = path[i - 1].x - path[i].x;
-                int yDelta = path[i - 1].y - path[i].y;
-                if (yDelta == -1 && xDelta == 0) {
-                    moves[(*moveCount)++] = 'N';
-                } else if (xDelta == 1 && yDelta == 0) {
-                    moves[(*moveCount)++] = 'E';
-                } else if (yDelta == 1 && xDelta == 0) {
-                    moves[(*moveCount)++] = 'S';
-                } else if (xDelta == -1 && yDelta == 0) {
-                    moves[(*moveCount)++] = 'W';
+        if (samePoint(currentPoint, goal)) {
+            int reverseCount = 0;
+            Point routePoint = goal;
+            while (!samePoint(routePoint, start)) {
+                Parent routeParent = parent[routePoint.x][routePoint.y];
+                if (!routeParent.hasPrevious ||
+                    reverseCount == DIMENSIONS * DIMENSIONS) {
+                    heap_free(&openSet);
+                    return false;
                 }
+                reverseMoveDirections[reverseCount++] = routeParent.moveDirection;
+                routePoint = routeParent.previous;
             }
-
+            for (int i = 0; i < reverseCount; i++) {
+                moveDirections[i] = reverseMoveDirections[reverseCount - i - 1];
+            }
+            *moveCount = reverseCount;
             heap_free(&openSet);
             return true;
         }
 
-        for (int i = 0; i < 4; i++) {
-            int x = current.point.x + neighborX[i];
-            int y = current.point.y + neighborY[i];
-            int tentativeG;
-
-            if (!inBounds(x, y) || beliefMap[x][y] != FREE) {
+        for (int direction = 0; direction < 4; direction++) {
+            Point nextPoint = {
+                currentPoint.x + directionX[direction],
+                currentPoint.y + directionY[direction]
+            };
+            if (!inBounds(nextPoint.x, nextPoint.y) ||
+                beliefMap[nextPoint.x][nextPoint.y] != FREE) {
                 continue;
             }
 
-            tentativeG = current.g + 1;
-            if (tentativeG < gScore[x][y]) {
-                gScore[x][y] = tentativeG;
-                parent[x][y] = current.point;
-                next.point = (Point){x, y};
-                next.g = tentativeG;
-                next.f = tentativeG + heuristic((Point){x, y}, homePosition);
+            int tentativeG = current.g + 1;
+            if (tentativeG < gScore[nextPoint.x][nextPoint.y]) {
+                gScore[nextPoint.x][nextPoint.y] = tentativeG;
+                parent[nextPoint.x][nextPoint.y] =
+                    (Parent){currentPoint, (Direction)direction, true};
+                next = (Node){
+                    nextPoint,
+                    tentativeG,
+                    tentativeG + heuristic(nextPoint, goal)
+                };
                 heap_push(&openSet, &next);
             }
         }
@@ -348,35 +284,140 @@ static bool aStar(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
     return false;
 }
 
-static bool aStarReturn(Robot *robotPtr, Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
-                        int groundTruthMap[DIMENSIONS][DIMENSIONS], Point homePosition,
-                        char *moves, int *moveCount) {
+static bool selectFrontier(Robot *robotPtr,
+                           Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
+                           Direction *moveDirections, int *moveCount,
+                           Direction *finalDirection) {
+    int bestGain = 0;
+    int bestCost = 0;
+    bool foundFrontier = false;
+    Point start = robotPosition(robotPtr);
+    Direction candidateMoveDirections[DIMENSIONS * DIMENSIONS];
+
+    *moveCount = 0;
+    for (int x = 0; x < DIMENSIONS; x++) {
+        for (int y = 0; y < DIMENSIONS; y++) {
+            if (beliefMap[x][y] != FREE) {
+                continue;
+            }
+            Point point = {x, y};
+            int candidateMoveCount;
+            if (!aStarRoute(beliefMap, start, point, candidateMoveDirections,
+                            &candidateMoveCount)) {
+                continue;
+            }
+
+            for (int direction = 0; direction < 4; direction++) {
+                int gain = countVisibleUnknown(point, (Direction)direction, beliefMap);
+                if (gain == 0) {
+                    continue;
+                }
+
+                // We add 1 to the denominator to avoid division by zero
+                int candidateDenominator = candidateMoveCount + 1;
+                int bestDenominator = bestCost + 1;
+                // We're effectively comparing gain/cost ratios, but we avoid floating point division by cross-multiplying.
+                bool betterScore = !foundFrontier ||
+                    gain * bestDenominator > bestGain * candidateDenominator;
+                bool equalScore = foundFrontier &&
+                    gain * bestDenominator == bestGain * candidateDenominator;
+                if (betterScore || (equalScore && candidateMoveCount < bestCost)) {
+                    for (int i = 0; i < candidateMoveCount; i++) {
+                        moveDirections[i] = candidateMoveDirections[i];
+                    }
+                    *moveCount = candidateMoveCount;
+                    *finalDirection = (Direction)direction;
+                    bestGain = gain;
+                    bestCost = candidateMoveCount;
+                    foundFrontier = true;
+                }
+            }
+        }
+    }
+    return foundFrontier;
+}
+
+static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                            Knowledge beliefMap[DIMENSIONS][DIMENSIONS]) {
+    int turnCount = (requiredDirection - *direction + 4) % 4;
+    if (turnCount == 1) {
+        right(robotPtr, groundTruthMap);
+        *direction = (Direction)((*direction + 1) % 4);
+        observe(robotPtr, groundTruthMap, beliefMap);
+    } else if (turnCount == 2) {
+        right(robotPtr, groundTruthMap);
+        *direction = (Direction)((*direction + 1) % 4);
+        observe(robotPtr, groundTruthMap, beliefMap);
+        right(robotPtr, groundTruthMap);
+        *direction = (Direction)((*direction + 1) % 4);
+        observe(robotPtr, groundTruthMap, beliefMap);
+    } else if (turnCount == 3) {
+        left(robotPtr, groundTruthMap);
+        *direction = (Direction)((*direction + 3) % 4);
+        observe(robotPtr, groundTruthMap, beliefMap);
+    }
+    *direction = requiredDirection;
+}
+
+static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
+                            int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                            Knowledge beliefMap[DIMENSIONS][DIMENSIONS]) {
+    turnToDirection(robotPtr, direction, requiredDirection, groundTruthMap, beliefMap);
+    forward(robotPtr, groundTruthMap);
+}
+
+static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                         Knowledge beliefMap[DIMENSIONS][DIMENSIONS],
+                         const Direction *moveDirections, int moveCount,
+                         bool alignFinalDirection, Direction finalDirection,
+                         bool stopAtMarker) {
     Direction direction = robotPtr->direction;
 
-    if (!aStar(robotPtr, beliefMap, homePosition, moves, moveCount)) {
-        return false;
+    for (int i = 0; i < moveCount; i++) {
+        moveInDirection(robotPtr, &direction, moveDirections[i], groundTruthMap,
+                        beliefMap);
+        observe(robotPtr, groundTruthMap, beliefMap);
+        if (stopAtMarker && atMarker(robotPtr, groundTruthMap)) {
+            return true;
+        }
     }
 
-    for (int i = 0; i < *moveCount; i++) {
-        Direction requiredDirection;
-        switch (moves[i]) {
-            case 'N':
-                requiredDirection = DIRECTION_NORTH;
-                break;
-            case 'E':
-                requiredDirection = DIRECTION_EAST;
-                break;
-            case 'S':
-                requiredDirection = DIRECTION_SOUTH;
-                break;
-            case 'W':
-                requiredDirection = DIRECTION_WEST;
-                break;
-            default:
-                continue;
-        }
+    if (alignFinalDirection) {
+        turnToDirection(robotPtr, &direction, finalDirection, groundTruthMap, beliefMap);
+    }
+    return false;
+}
 
-        moveInDirection(robotPtr, &direction, requiredDirection, groundTruthMap);
+static bool deliverMarkers(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                           Knowledge beliefMap[DIMENSIONS][DIMENSIONS], Point homePosition) {
+    Point markerPosition = robotPosition(robotPtr);
+    int markersAtSquare = groundTruthMap[markerPosition.x][markerPosition.y] - 2;
+
+    for (int marker = 0; marker < markersAtSquare; marker++) {
+        Direction moveDirections[DIMENSIONS * DIMENSIONS];
+        int moveCount;
+        Point start = robotPosition(robotPtr);
+
+        robotPtr->isCarryingMarker = true;
+        --groundTruthMap[markerPosition.x][markerPosition.y]; // maybe we could have a seperate function for this, like "pickUpMarker" or something, to make sure we never decrease to zero (from FREE to BLOCKED), though that's probably unnecessary, as we need to check if there's a marker there anyways
+        if (!aStarRoute(beliefMap, start, homePosition, moveDirections, &moveCount)) {
+            robotPtr->isCarryingMarker = false;
+            return false;
+        }
+        executeRoute(robotPtr, groundTruthMap, beliefMap, moveDirections, moveCount,
+                     false, DIRECTION_NORTH, false);
+        robotPtr->isCarryingMarker = false;
+
+        if (marker < markersAtSquare - 1) { // if not last marker, come back to the marker position to pick up the next one
+            start = robotPosition(robotPtr);
+            if (!aStarRoute(beliefMap, start, markerPosition, moveDirections,
+                            &moveCount)) {
+                return false;
+            }
+            executeRoute(robotPtr, groundTruthMap, beliefMap, moveDirections, moveCount,
+                         false, DIRECTION_NORTH, false);
+        }
     }
     return true;
 }
