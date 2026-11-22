@@ -1,4 +1,9 @@
+#ifndef SQUARE_SIDE_LENGTH
 #define SQUARE_SIDE_LENGTH 50
+#endif
+
+#ifndef DIMENSIONS
 #define DIMENSIONS 10
+#endif
 #define WAIT_TIME_MOVE 250
 #define WAIT_TIME_TURN 100
