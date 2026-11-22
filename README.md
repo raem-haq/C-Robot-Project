@@ -1,41 +1,100 @@
-# C-Robot-Project
+# C Robot Project
 
-This coursework completes all 6 stages. My program reads in coordinates for obstacles and markers from a text file, and these values were randomly generated coordinates, then inputted by me into the text file.
+C Robot Project is a grid-based robot exploration simulation written in C. The
+robot navigates a map of obstacles and markers, rendered in an SDL2 window. It
+builds its understanding of the map as it moves, collects markers, delivers
+them to its starting square, and returns home after exploration is complete.
 
-My traversal algorithm is based on DFS. I don't check the number of markers on the grid (or the number of markers remaining to see if the algorithm should stop), because I wanted the robot to have no information on the 
+## How it works
 
-## running the program
+The map is loaded from the files in `data/`, but route planning uses a separate
+belief map. Initially, every cell is unknown. At each position, the robot
+observes its current cell and nearby cells based on its heading, then chooses a
+reachable frontier that offers new information relative to travel cost. A*
+search finds routes through cells known to be free. When the robot finds a
+marker, it returns to the home square to deliver it before continuing.
 
-Install the SDL2 development package and `pkg-config`, then compile from the
-project directory:
+## Repository layout
+
+- `main.c` — loads the map, initializes the robot, and starts the simulation.
+- `simulation/` — grid setup, robot movement, and exploration planning.
+- `drawing/` — SDL2 graphics adapter for the grid and simulation.
+- `heap.c`, `heap.h` — min-heap used by route planning.
+- `data/markers.txt`, `data/obstacles.txt` — marker and obstacle coordinates.
+- `tests/` — headless test runner and graphics stubs.
+
+## Requirements
+
+- A C11-compatible compiler
+- GNU Make
+- `pkg-config`
+- SDL2 development libraries
+
+## Build and run
+
+Build the graphical application from the repository root:
 
 ```sh
-gcc -Wall -Wextra -o robot main.c drawing/graphics.c simulation/robot.c \
-  simulation/grid.c simulation/planner.c heap.c \
-  $(pkg-config --cflags --libs sdl2) -lm
+make
 ```
 
-Run it directly; the SDL2 window closes when you press Escape or its close
-button. The graphics adapter includes a small bitmap font and loads BMP images
-through SDL2:
+If `robot` is already up to date, Make prints `Nothing to be done for 'all'`.
+To force a fresh build, remove the generated executables first:
+
+```sh
+make clean && make
+```
+
+Start at the default home square `(0, 0)`, facing east:
 
 ```sh
 ./robot
 ```
 
-You can also choose a starting location and direction. For example, to start
-from (9,8) facing east:
+Optionally provide the home cell and initial direction:
 
 ```sh
 ./robot 9 8 east
 ```
 
-You must always put the direction in lowercase. The coordinate system is such that the top left corner is (0,0) and $y$ increases as you go down the screen and $x$ increases as you move right, $x, y$ must be non-negative integers. Also $x, y$ must be strictly less than ```DIMENSIONS``` in ```constants.h```.
+Directions are `north`, `east`, `south`, or `west` (lowercase). Coordinates
+refer to grid cells: `(0, 0)` is the top-left cell, x increases to the right,
+and y increases downward. Both coordinates must be between `0` and
+`DIMENSIONS - 1`. Close the SDL2 window with Escape or its close button.
 
-## changing obstacle and marker positions
+Run the headless test runner with:
 
-Marker and obstacle locations are read from text files, ```data/obstacles.txt``` and ```data/markers.txt```. If you want to modify these files, make sure you don't place a marker and an obstacle, a marker and the home square or an obstacle and the home square, on the same square, which will cause issues and display an error message.
+```sh
+make test
+```
 
-## changing the animation speed
+The test build uses no SDL2 dependency; graphics calls are replaced by no-op
+stubs. To remove the generated executables:
 
-If you want to speed up or slow down the program, go to ```constants.h``` and decrease or increase the ```WAIT_TIME_TURN``` and/or ```WAIT_TIME_MOVE``` variables, respectively.
+```sh
+make clean
+```
+
+## Map data and configuration
+
+Each line in `data/markers.txt` and `data/obstacles.txt` contains one cell
+coordinate in `x,y` format, with no header or blank lines. Repeated marker
+coordinates represent multiple markers in the same cell. Run the application
+from the repository root so it can find these relative paths. Keep coordinates
+within the configured grid, and do not place an obstacle on a marker or the
+home square, or a marker on the home square.
+
+`constants.h` sets the default grid size (`DIMENSIONS`, 10 cells per side), cell
+size (`SQUARE_SIDE_LENGTH`, 50 pixels), and movement/turn delays. Override the
+grid size for a build with Make's `DIM` variable:
+
+```sh
+make DIM=12
+```
+
+The `bench` target expects `bench/bench.c`; that source is not currently
+included in the repository.
+
+## To Do
+
+Since switching to a frontier-based exploration instead of DFS, the robot prioritises exploring the whole map (and terminates when their are no more frontiers left to explore). As a result, it doesn't collect all the markers as it used to. I could very easily force it to collect all markers at the end and then terminate, but this feels like an arbitrary decision. Why should the robot collect all the markers? I'm looking for ways to better define what the robot's goal, hopefully integrating exploration and marker collection.
