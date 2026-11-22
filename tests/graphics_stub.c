@@ -1,5 +1,5 @@
 #include "../drawing/graphics.h"
-
+// we convert to void to stop compiler warnings about unused parameters
 void drawLine(int x1, int y1, int x2, int y2) {
     (void)x1;
     (void)y1;
