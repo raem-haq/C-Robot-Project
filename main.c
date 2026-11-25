@@ -21,11 +21,15 @@ int main(int argc, char **argv) {
     int homeY = 0;
     char *typedDirection = "east";
     Direction initDir = DIRECTION_EAST;
+    int energy = ENERGY_DEFAULT;
 
-    if (argc == 4) {
+    if (argc == 4 || argc == 5) {
         homeX = atoi(argv[1]);
         homeY = atoi(argv[2]);
         typedDirection = argv[3];
+        if (argc == 5) {
+            energy = atoi(argv[4]);
+        }
     }
 
     if (strcmp(typedDirection, "north") == 0) {
@@ -64,7 +68,10 @@ int main(int argc, char **argv) {
                    groundTruthMap); // draw the robot, obstacles, markers and the home square
 
     Mission mission = {0};
+    mission.energy = energy;
     bool success = exploreAndReturn(robotPtr, groundTruthMap, &mission);
+    printf("Delivered: %d, steps: %d, remaining energy: %d\n", mission.delivered, mission.steps,
+           mission.energy);
     waitForClose();
 
     return success ? EXIT_SUCCESS : EXIT_FAILURE;

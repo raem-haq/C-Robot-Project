@@ -362,6 +362,7 @@ static void moveInDirection(Robot *robotPtr, Direction *direction, Direction req
     turnToDirection(robotPtr, direction, requiredDirection, groundTruthMap, belief);
     forward(robotPtr, groundTruthMap);
     mission->steps++;
+    mission->energy--;
 }
 
 static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],

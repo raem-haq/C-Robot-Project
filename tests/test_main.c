@@ -79,6 +79,7 @@ static void run_marker_mission(char rows[DIMENSIONS][DIMENSIONS + 1]) {
     CHECK(exploreAndReturn(&robot, map, &mission));
     CHECK(count_ground_truth_markers(map) == 0);
     CHECK(mission.delivered == initialMarkerTotal);
+    CHECK(mission.energy == -mission.steps);
 }
 
 static void initialize_ascii_map(char rows[DIMENSIONS][DIMENSIONS + 1]) {
