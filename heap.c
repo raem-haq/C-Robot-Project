@@ -1,5 +1,6 @@
 #include "heap.h"
 
+#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -17,6 +18,7 @@ static void *heap_element(MinHeap *heap, int index) {
 }
 
 void heap_init(MinHeap *heap, int capacity, size_t elementSize, CompareFn compare) {
+    assert(heap != NULL);
     heap->data = NULL;
     heap->size = 0;
     heap->capacity = 0;
@@ -42,6 +44,12 @@ void heap_init(MinHeap *heap, int capacity, size_t elementSize, CompareFn compar
 }
 
 void heap_push(MinHeap *heap, const void *element) {
+    assert(heap != NULL);
+    assert(element != NULL);
+    assert(heap->size >= 0);
+    assert(heap->size <= heap->capacity);
+    assert(heap->elementSize > 0);
+    assert(heap->compare != NULL);
     if (heap->size == INT_MAX) {
         heap_error(heap, "Heap is at maximum capacity");
     }
@@ -90,6 +98,11 @@ void heap_push(MinHeap *heap, const void *element) {
 }
 
 void heap_pop(MinHeap *heap, void *result) {
+    assert(heap != NULL);
+    assert(heap->size >= 0);
+    assert(heap->size <= heap->capacity);
+    assert(heap->elementSize > 0);
+    assert(heap->compare != NULL);
     if (heap->size == 0) {
         heap_error(heap, "Cannot pop from an empty heap");
     }

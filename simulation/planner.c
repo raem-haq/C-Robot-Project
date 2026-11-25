@@ -1,5 +1,6 @@
 #include "planner.h"
 
+#include <assert.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -20,6 +21,12 @@ typedef struct {
     bool hasPrevious;
 } Parent;
 
+typedef enum {
+    ROUTE_DONE,
+    ROUTE_STOPPED_AT_MARKER,
+    ROUTE_ABORTED
+} RouteResult;
+
 static const int directionX[] = {0, 1, 0, -1};
 static const int directionY[] = {-1, 0, 1, 0};
 
@@ -31,6 +38,7 @@ static Point robotPosition(const Robot *robotPtr);
 static int countVisibleUnknown(Point point, Direction direction, const Belief *belief);
 static bool aStarRoute(const Belief *belief, Point start, Point goal, Direction *moveDirections,
                        int *moveCount);
+static int routeDistance(const Belief *belief, Point start, Point goal);
 static bool selectFrontier(Robot *robotPtr, const Belief *belief, Direction *moveDirections,
                            int *moveCount, Direction *finalDirection);
 static void turnToDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
@@ -38,12 +46,21 @@ static void turnToDirection(Robot *robotPtr, Direction *direction, Direction req
 static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
                             int groundTruthMap[DIMENSIONS][DIMENSIONS], Belief *belief,
                             Mission *mission);
-static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                         Belief *belief, const Direction *moveDirections, int moveCount,
-                         bool alignFinalDirection, Direction finalDirection, bool stopAtMarker,
-                         Mission *mission);
+static RouteResult executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                                Belief *belief, const Direction *moveDirections, int moveCount,
+                                bool alignFinalDirection, Direction finalDirection,
+                                bool stopAtMarker, bool checkReturnEnergy, Point homePosition,
+                                Mission *mission);
+static bool returnHome(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                       Belief *belief, Point homePosition, Mission *mission);
 
 bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS], Mission *mission) {
+    assert(robotPtr != NULL);
+    assert(map != NULL);
+    assert(mission != NULL);
+    assert(mission->energy >= 0);
+    assert(mission->steps >= 0);
+    assert(mission->delivered >= 0);
     Belief belief;
     Direction moveDirections[DIMENSIONS * DIMENSIONS];
     Point homePosition = {robotPtr->xP / SQUARE_SIDE_LENGTH, robotPtr->yP / SQUARE_SIDE_LENGTH};
@@ -69,7 +86,7 @@ bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS], Mission 
                 return false;
             }
             executeRoute(robotPtr, map, &belief, moveDirections, moveCount, false, DIRECTION_NORTH,
-                         false, mission);
+                         false, false, homePosition, mission);
             robotPtr->isCarryingMarker = false;
             mission->delivered++;
             continue;
@@ -97,18 +114,27 @@ bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS], Mission 
             }
         }
         if (nearestMarker.x >= 0) {
-            executeRoute(robotPtr, map, &belief, moveDirections, moveCount, false, DIRECTION_NORTH,
-                         true, mission);
+            RouteResult result =
+                executeRoute(robotPtr, map, &belief, moveDirections, moveCount, false,
+                             DIRECTION_NORTH, true, true, homePosition, mission);
+            if (result == ROUTE_ABORTED) {
+                return returnHome(robotPtr, map, &belief, homePosition, mission);
+            }
             continue;
         }
 
         if (selectFrontier(robotPtr, &belief, moveDirections, &moveCount, &finalDirection)) {
-            executeRoute(robotPtr, map, &belief, moveDirections, moveCount, true, finalDirection,
-                         true, mission);
+            RouteResult result =
+                executeRoute(robotPtr, map, &belief, moveDirections, moveCount, true,
+                             finalDirection, true, true, homePosition, mission);
+            if (result == ROUTE_ABORTED) {
+                return returnHome(robotPtr, map, &belief, homePosition, mission);
+            }
             continue;
         }
 
         if (currentPosition.x == homePosition.x && currentPosition.y == homePosition.y) {
+            assert(mission->energy >= 0);
             return true;
         }
 
@@ -116,10 +142,13 @@ bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS], Mission 
             fprintf(stderr, "ERROR: Could not find a known route back to the home square\n");
             return false;
         }
-        if (executeRoute(robotPtr, map, &belief, moveDirections, moveCount, false, DIRECTION_NORTH,
-                         true, mission)) {
+        RouteResult result =
+            executeRoute(robotPtr, map, &belief, moveDirections, moveCount, false,
+                         DIRECTION_NORTH, true, false, homePosition, mission);
+        if (result == ROUTE_STOPPED_AT_MARKER) {
             continue;
         }
+        assert(mission->energy >= 0);
         return true;
     }
 }
@@ -157,6 +186,16 @@ static bool samePoint(Point a, Point b) {
 
 static Point robotPosition(const Robot *robotPtr) {
     return (Point){robotPtr->xP / SQUARE_SIDE_LENGTH, robotPtr->yP / SQUARE_SIDE_LENGTH};
+}
+
+static int routeDistance(const Belief *belief, Point start, Point goal) {
+    Direction moveDirections[DIMENSIONS * DIMENSIONS];
+    int moveCount;
+
+    if (!aStarRoute(belief, start, goal, moveDirections, &moveCount)) {
+        return INT_MAX;
+    }
+    return moveCount;
 }
 
 void observe(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS], Belief *belief) {
@@ -365,22 +404,54 @@ static void moveInDirection(Robot *robotPtr, Direction *direction, Direction req
     mission->energy--;
 }
 
-static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                         Belief *belief, const Direction *moveDirections, int moveCount,
-                         bool alignFinalDirection, Direction finalDirection, bool stopAtMarker,
-                         Mission *mission) {
+static RouteResult executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                                Belief *belief, const Direction *moveDirections, int moveCount,
+                                bool alignFinalDirection, Direction finalDirection,
+                                bool stopAtMarker, bool checkReturnEnergy, Point homePosition,
+                                Mission *mission) {
     Direction direction = robotPtr->direction;
 
     for (int i = 0; i < moveCount; i++) {
+        if (checkReturnEnergy) {
+            Point here = robotPosition(robotPtr);
+            Point next = {here.x + directionX[moveDirections[i]],
+                          here.y + directionY[moveDirections[i]]};
+            int gHere = routeDistance(belief, here, homePosition);
+            int gNext = routeDistance(belief, next, homePosition);
+            int gHerePlusOne = gHere == INT_MAX ? INT_MAX : gHere + 1;
+            int returnCost = gHerePlusOne < gNext ? gHerePlusOne : gNext;
+            if (mission->energy <= returnCost) {
+                return ROUTE_ABORTED;
+            }
+        }
+
         moveInDirection(robotPtr, &direction, moveDirections[i], groundTruthMap, belief, mission);
         observe(robotPtr, groundTruthMap, belief);
+        if (checkReturnEnergy) {
+            assert(mission->energy >=
+                   routeDistance(belief, robotPosition(robotPtr), homePosition));
+        }
         if (stopAtMarker && atMarker(robotPtr, groundTruthMap)) {
-            return true;
+            return ROUTE_STOPPED_AT_MARKER;
         }
     }
 
     if (alignFinalDirection) {
         turnToDirection(robotPtr, &direction, finalDirection, groundTruthMap, belief);
     }
-    return false;
+    return ROUTE_DONE;
+}
+
+static bool returnHome(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
+                       Belief *belief, Point homePosition, Mission *mission) {
+    Direction moveDirections[DIMENSIONS * DIMENSIONS];
+    int moveCount;
+    if (!aStarRoute(belief, robotPosition(robotPtr), homePosition, moveDirections, &moveCount)) {
+        fprintf(stderr, "ERROR: Could not find a known route back to the home square\n");
+        return false;
+    }
+    executeRoute(robotPtr, groundTruthMap, belief, moveDirections, moveCount, false,
+                 DIRECTION_NORTH, false, false, homePosition, mission);
+    assert(mission->energy >= 0);
+    return true;
 }

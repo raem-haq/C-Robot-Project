@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 void displayBlocksAndGoals(int[DIMENSIONS][DIMENSIONS]);
 void drawGrid(void);
@@ -71,6 +72,9 @@ void drawGrid() {
 }
 
 void addMarker(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
+    assert(map != NULL);
+    assert(x >= 0 && x < DIMENSIONS);
+    assert(y >= 0 && y < DIMENSIONS);
     switch (map[x][y]) {
     case 1:
         printf("ERROR: CANNOT PLACE MARKER ON HOME SQUARE\n");
@@ -85,6 +89,9 @@ void addMarker(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
 }
 
 void addObstacle(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
+    assert(map != NULL);
+    assert(x >= 0 && x < DIMENSIONS);
+    assert(y >= 0 && y < DIMENSIONS);
     switch (map[x][y]) {
     case 2:
         map[x][y] = 0; // 0 for obstacle
@@ -101,5 +108,8 @@ void addObstacle(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
 }
 
 void addHome(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
+    assert(map != NULL);
+    assert(x >= 0 && x < DIMENSIONS);
+    assert(y >= 0 && y < DIMENSIONS);
     map[x][y] = 1; // happens before adding obstacles and markers so it doesn't need switch-cases
 }

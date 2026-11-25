@@ -72,14 +72,14 @@ static int count_ground_truth_markers(int map[DIMENSIONS][DIMENSIONS]) {
 static void run_marker_mission(char rows[DIMENSIONS][DIMENSIONS + 1]) {
     int map[DIMENSIONS][DIMENSIONS];
     Robot robot;
-    Mission mission = {0};
+    Mission mission = {.energy = ENERGY_DEFAULT};
 
     map_from_ascii(rows, map, &robot);
     int initialMarkerTotal = count_ground_truth_markers(map);
     CHECK(exploreAndReturn(&robot, map, &mission));
     CHECK(count_ground_truth_markers(map) == 0);
     CHECK(mission.delivered == initialMarkerTotal);
-    CHECK(mission.energy == -mission.steps);
+    CHECK(mission.energy == ENERGY_DEFAULT - mission.steps);
 }
 
 static void initialize_ascii_map(char rows[DIMENSIONS][DIMENSIONS + 1]) {
@@ -171,11 +171,30 @@ static void test_visible_marker_off_frontier_path(void) {
     watchdog_stop();
 }
 
+static void test_low_energy_aborts_route_and_returns_home(void) {
+    char rows[DIMENSIONS][DIMENSIONS + 1];
+    int map[DIMENSIONS][DIMENSIONS];
+    Robot robot;
+    Mission mission = {.energy = 1};
+
+    initialize_ascii_map(rows);
+    set_ascii_cell(rows, DIMENSIONS / 2, DIMENSIONS / 2, 'H');
+    set_ascii_cell(rows, DIMENSIONS / 2 + 1, DIMENSIONS / 2, '1');
+    map_from_ascii(rows, map, &robot);
+
+    CHECK(exploreAndReturn(&robot, map, &mission));
+    CHECK(robot.xP / SQUARE_SIDE_LENGTH == DIMENSIONS / 2);
+    CHECK(robot.yP / SQUARE_SIDE_LENGTH == DIMENSIONS / 2);
+    CHECK(mission.delivered == 0);
+    CHECK(mission.energy == 1);
+}
+
 int main(void) {
     test_smoke();
     test_observe_updates_belief_and_markers();
     test_stacked_markers();
     test_visible_marker_off_frontier_path();
+    test_low_energy_aborts_route_and_returns_home();
     puts("tests passed");
     return EXIT_SUCCESS;
 }
