@@ -41,16 +41,15 @@ static void turnToDirection(Robot *robotPtr, Direction *direction, Direction req
                             Belief *belief);
 static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
                             int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                            Belief *belief);
+                            Belief *belief, Mission *mission);
 static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
                          Belief *belief,
                          const Direction *moveDirections, int moveCount,
                          bool alignFinalDirection, Direction finalDirection,
-                         bool stopAtMarker);
-static bool deliverMarkers(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                           Belief *belief, Point homePosition);
+                         bool stopAtMarker, Mission *mission);
 
-bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
+bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS],
+                      Mission *mission) {
     Belief belief;
     Direction moveDirections[DIMENSIONS * DIMENSIONS];
     Point homePosition = {
@@ -66,22 +65,60 @@ bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
         int moveCount = 0;
         Direction finalDirection = DIRECTION_NORTH;
 
-        if (atMarker(robotPtr, map)) {
-            if (!deliverMarkers(robotPtr, map, &belief, homePosition)) {
+        if (!robotPtr->isCarryingMarker &&
+            belief.markers[currentPosition.x][currentPosition.y] > 0) {
+            robotPtr->isCarryingMarker = true;
+            --map[currentPosition.x][currentPosition.y];
+            --belief.markers[currentPosition.x][currentPosition.y];
+        }
+
+        if (robotPtr->isCarryingMarker) {
+            if (!aStarRoute(&belief, currentPosition, homePosition,
+                            moveDirections, &moveCount)) {
                 fprintf(stderr, "ERROR: Could not find a known route to deliver a marker\n");
                 return false;
             }
+            executeRoute(robotPtr, map, &belief, moveDirections, moveCount,
+                         false, DIRECTION_NORTH, false, mission);
+            robotPtr->isCarryingMarker = false;
+            mission->delivered++;
+            continue;
+        }
+
+        Point nearestMarker = {-1, -1};
+        int nearestMarkerDistance = INT_MAX;
+        Direction markerRoute[DIMENSIONS * DIMENSIONS];
+        for (int x = 0; x < DIMENSIONS; x++) {
+            for (int y = 0; y < DIMENSIONS; y++) {
+                if (belief.cell[x][y] != FREE || belief.markers[x][y] <= 0) {
+                    continue;
+                }
+                int candidateMoveCount;
+                if (aStarRoute(&belief, currentPosition, (Point){x, y},
+                               markerRoute, &candidateMoveCount) &&
+                    candidateMoveCount < nearestMarkerDistance) {
+                    for (int i = 0; i < candidateMoveCount; i++) {
+                        moveDirections[i] = markerRoute[i];
+                    }
+                    moveCount = candidateMoveCount;
+                    nearestMarker = (Point){x, y};
+                    nearestMarkerDistance = candidateMoveCount;
+                }
+            }
+        }
+        if (nearestMarker.x >= 0) {
+            executeRoute(robotPtr, map, &belief, moveDirections, moveCount,
+                         false, DIRECTION_NORTH, true, mission);
             continue;
         }
 
         if (selectFrontier(robotPtr, &belief, moveDirections, &moveCount,
                            &finalDirection)) {
             executeRoute(robotPtr, map, &belief, moveDirections, moveCount,
-                         true, finalDirection, true);
+                         true, finalDirection, true, mission);
             continue;
         }
-        // if we reach here, there are no more frontiers to explore, since selectFrontier returned false.
-        // We should return home, if we are not already there.
+
         if (currentPosition.x == homePosition.x && currentPosition.y == homePosition.y) {
             return true;
         }
@@ -92,7 +129,7 @@ bool exploreAndReturn(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
             return false;
         }
         if (executeRoute(robotPtr, map, &belief, moveDirections, moveCount,
-                         false, DIRECTION_NORTH, true)) {
+                         false, DIRECTION_NORTH, true, mission)) {
             continue;
         }
         return true;
@@ -353,21 +390,22 @@ static void turnToDirection(Robot *robotPtr, Direction *direction, Direction req
 
 static void moveInDirection(Robot *robotPtr, Direction *direction, Direction requiredDirection,
                             int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                            Belief *belief) {
+                            Belief *belief, Mission *mission) {
     turnToDirection(robotPtr, direction, requiredDirection, groundTruthMap, belief);
     forward(robotPtr, groundTruthMap);
+    mission->steps++;
 }
 
 static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
                          Belief *belief,
                          const Direction *moveDirections, int moveCount,
                          bool alignFinalDirection, Direction finalDirection,
-                         bool stopAtMarker) {
+                         bool stopAtMarker, Mission *mission) {
     Direction direction = robotPtr->direction;
 
     for (int i = 0; i < moveCount; i++) {
         moveInDirection(robotPtr, &direction, moveDirections[i], groundTruthMap,
-                        belief);
+                        belief, mission);
         observe(robotPtr, groundTruthMap, belief);
         if (stopAtMarker && atMarker(robotPtr, groundTruthMap)) {
             return true;
@@ -378,37 +416,4 @@ static bool executeRoute(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSI
         turnToDirection(robotPtr, &direction, finalDirection, groundTruthMap, belief);
     }
     return false;
-}
-
-static bool deliverMarkers(Robot *robotPtr, int groundTruthMap[DIMENSIONS][DIMENSIONS],
-                           Belief *belief, Point homePosition) {
-    Point markerPosition = robotPosition(robotPtr);
-    int markersAtSquare = groundTruthMap[markerPosition.x][markerPosition.y] - 2;
-
-    for (int marker = 0; marker < markersAtSquare; marker++) {
-        Direction moveDirections[DIMENSIONS * DIMENSIONS];
-        int moveCount;
-        Point start = robotPosition(robotPtr);
-
-        robotPtr->isCarryingMarker = true;
-        --groundTruthMap[markerPosition.x][markerPosition.y]; // maybe we could have a seperate function for this, like "pickUpMarker" or something, to make sure we never decrease to zero (from FREE to BLOCKED), though that's probably unnecessary, as we need to check if there's a marker there anyways
-        if (!aStarRoute(belief, start, homePosition, moveDirections, &moveCount)) {
-            robotPtr->isCarryingMarker = false;
-            return false;
-        }
-        executeRoute(robotPtr, groundTruthMap, belief, moveDirections, moveCount,
-                     false, DIRECTION_NORTH, false);
-        robotPtr->isCarryingMarker = false;
-
-        if (marker < markersAtSquare - 1) { // if not last marker, come back to the marker position to pick up the next one
-            start = robotPosition(robotPtr);
-            if (!aStarRoute(belief, start, markerPosition, moveDirections,
-                            &moveCount)) {
-                return false;
-            }
-            executeRoute(robotPtr, groundTruthMap, belief, moveDirections, moveCount,
-                         false, DIRECTION_NORTH, false);
-        }
-    }
-    return true;
 }

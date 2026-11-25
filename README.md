@@ -97,4 +97,3 @@ included in the repository.
 
 ## To Do
 
-Since switching to a frontier-based exploration instead of DFS, the robot prioritises exploring the whole map (and terminates when their are no more frontiers left to explore). As a result, it doesn't collect all the markers as it used to. I could very easily force it to collect all markers at the end and then terminate, but this feels like an arbitrary decision. Why should the robot collect all the markers? I'm looking for ways to better define what the robot's goal, hopefully integrating exploration and marker collection.
