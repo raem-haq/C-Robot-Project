@@ -61,7 +61,8 @@ int main(int argc, char** argv) {
     drawGrid();//draw the grid lines
     drawForeground(robotPtr, groundTruthMap);//draw the robot, obstacles, markers and the home square
 
-    bool success = exploreAndReturn(robotPtr, groundTruthMap);
+    Mission mission = {0};
+    bool success = exploreAndReturn(robotPtr, groundTruthMap, &mission);
     waitForClose();
 
     return success ? EXIT_SUCCESS : EXIT_FAILURE;
