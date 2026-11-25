@@ -2,3 +2,4 @@
 *.out
 robot
 test_runner
+.clang-format

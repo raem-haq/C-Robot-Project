@@ -1,17 +1,17 @@
+#include "../constants.h"
 #include "../drawing/graphics.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../constants.h"
 
-void displayBlocksAndGoals(int [DIMENSIONS][DIMENSIONS]);
+void displayBlocksAndGoals(int[DIMENSIONS][DIMENSIONS]);
 void drawGrid(void);
 
-void initGrid(int [DIMENSIONS][DIMENSIONS]);
+void initGrid(int[DIMENSIONS][DIMENSIONS]);
 
-void addObstacle(int [DIMENSIONS][DIMENSIONS], int, int);
-void addMarker(int [DIMENSIONS][DIMENSIONS], int, int);
-void addHome(int [DIMENSIONS][DIMENSIONS], int, int);
+void addObstacle(int[DIMENSIONS][DIMENSIONS], int, int);
+void addMarker(int[DIMENSIONS][DIMENSIONS], int, int);
+void addHome(int[DIMENSIONS][DIMENSIONS], int, int);
 
 /*
 map[x][y] -- meaning
@@ -39,28 +39,32 @@ void displayBlocksAndGoals(int map[DIMENSIONS][DIMENSIONS]) {
         for (int j = 0; j < DIMENSIONS; j++) {
             if (map[i][j] == 1) {
                 setColour(green);
-                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
+                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH,
+                         SQUARE_SIDE_LENGTH);
             } else if (map[i][j] == 0) {
                 setColour(black);
-                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
+                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH,
+                         SQUARE_SIDE_LENGTH);
             } else if (map[i][j] == 3) {
                 setColour(lightgray);
-                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
+                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH,
+                         SQUARE_SIDE_LENGTH);
             } else if (map[i][j] > 3) {
                 setColour(yellow);
-                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
+                fillRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH,
+                         SQUARE_SIDE_LENGTH);
             }
         }
     }
 }
-
 
 void drawGrid() {
     background();
     setColour(black);
     for (int i = 0; i < DIMENSIONS; i++) {
         for (int j = 0; j < DIMENSIONS; j++) {
-            drawRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
+            drawRect(SQUARE_SIDE_LENGTH * i, SQUARE_SIDE_LENGTH * j, SQUARE_SIDE_LENGTH,
+                     SQUARE_SIDE_LENGTH);
         }
     }
     foreground();
@@ -80,24 +84,22 @@ void addMarker(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
     }
 }
 
-
-
 void addObstacle(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
     switch (map[x][y]) {
-        case 2:
-            map[x][y] = 0;//0 for obstacle
-            break;
-        case 1:
-            printf("ERROR: CANNOT PLACE OBSTACLE ON HOME SQUARE\n");
-            break;
-        case 0:
-            break;
-        default:
-            printf("ERROR: CANNOT PLACE OBSTACLE ON MARKER\n");
-            break;
+    case 2:
+        map[x][y] = 0; // 0 for obstacle
+        break;
+    case 1:
+        printf("ERROR: CANNOT PLACE OBSTACLE ON HOME SQUARE\n");
+        break;
+    case 0:
+        break;
+    default:
+        printf("ERROR: CANNOT PLACE OBSTACLE ON MARKER\n");
+        break;
     }
 }
 
 void addHome(int map[DIMENSIONS][DIMENSIONS], int x, int y) {
-    map[x][y] = 1; //happens before adding obstacles and markers so it doesn't need switch-cases
+    map[x][y] = 1; // happens before adding obstacles and markers so it doesn't need switch-cases
 }

@@ -113,8 +113,7 @@ void heap_pop(MinHeap *heap, void *result) {
             heap->compare(heap_element(heap, right), heap_element(heap, left)) < 0) {
             smallest = right;
         }
-        if (heap->compare(heap_element(heap, heap->size),
-                          heap_element(heap, smallest)) <= 0) {
+        if (heap->compare(heap_element(heap, heap->size), heap_element(heap, smallest)) <= 0) {
             break;
         }
 

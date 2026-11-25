@@ -1,15 +1,15 @@
+#include "robot.h"
+#include "../constants.h"
 #include "../drawing/graphics.h"
+#include "grid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "grid.h"
-#include "robot.h"
-#include "../constants.h"
 
 static const int STEPS = 1;
 
-static void moveOneCell(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS],
-                        Pixel xDirection, Pixel yDirection) {
+static void moveOneCell(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS], Pixel xDirection,
+                        Pixel yDirection) {
     Pixel increment = SQUARE_SIDE_LENGTH / STEPS;
 
     for (int i = 0; i < STEPS; i++) {
@@ -27,7 +27,7 @@ int atMarker(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     return map[x][y] >= 3;
 }
 
-void drawForeground(Robot* robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
+void drawForeground(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     displayBlocksAndGoals(map);
     drawRobot(robotPtr);
 }
@@ -35,14 +35,14 @@ void drawForeground(Robot* robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
 int canForward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     int result;
 
-    int xC = (robotPtr->xP) / SQUARE_SIDE_LENGTH;//again convert from pixels to coordinates
+    int xC = (robotPtr->xP) / SQUARE_SIDE_LENGTH; // again convert from pixels to coordinates
     int yC = (robotPtr->yP) / SQUARE_SIDE_LENGTH;
 
     switch (robotPtr->direction) {
     case DIRECTION_NORTH:
-        result = ((yC - 1) >= 0);//check if you would be in the grid
+        result = ((yC - 1) >= 0); // check if you would be in the grid
         if (result) {
-            //then check if you would be on an obstacle
+            // then check if you would be on an obstacle
             result = (map[xC][yC - 1] != 0);
         }
         break;
@@ -70,8 +70,6 @@ int canForward(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     }
     return result;
 }
-
-
 
 void left(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
     clear();
@@ -119,49 +117,57 @@ void drawRobot(Robot *robotPtr) {
     }
 
     fillOval(robotPtr->xP, robotPtr->yP, SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH);
-    
+
     // eyes
     setColour(black);
     if (robotPtr->direction == DIRECTION_NORTH) {
-        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3 - SQUARE_SIDE_LENGTH / 5, robotPtr->yP + SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-        fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3 - SQUARE_SIDE_LENGTH / 5,
+                 robotPtr->yP + SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5,
+                 SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 5,
+                 SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
     } else if (robotPtr->direction == DIRECTION_EAST) {
-        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-        fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3,
+                 SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3,
+                 SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
     } else if (robotPtr->direction == DIRECTION_SOUTH) {
-        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + 2 * SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-        fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3, robotPtr->yP + 2 * SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + 2 * SQUARE_SIDE_LENGTH / 3,
+                 SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + 2 * SQUARE_SIDE_LENGTH / 3,
+                 robotPtr->yP + 2 * SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5,
+                 SQUARE_SIDE_LENGTH / 5);
     } else if (robotPtr->direction == DIRECTION_WEST) {
-        fillRect(robotPtr->xP, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
-        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP, robotPtr->yP + SQUARE_SIDE_LENGTH / 3, SQUARE_SIDE_LENGTH / 5,
+                 SQUARE_SIDE_LENGTH / 5);
+        fillRect(robotPtr->xP + SQUARE_SIDE_LENGTH / 3, robotPtr->yP + SQUARE_SIDE_LENGTH / 3,
+                 SQUARE_SIDE_LENGTH / 5, SQUARE_SIDE_LENGTH / 5);
     }
-    
 }
 
-
-void goHome(Robot *robotPtr, char* moveStack, int noOfMoves, int map[DIMENSIONS][DIMENSIONS]) {
+void goHome(Robot *robotPtr, char *moveStack, int noOfMoves, int map[DIMENSIONS][DIMENSIONS]) {
     char instruct;
     turnAround(robotPtr, map);
     for (int i = noOfMoves - 1; i >= 0; i--) {
-        instruct = *(moveStack+i);
+        instruct = *(moveStack + i);
         switch (instruct) {
-            case 'F':
-                forward(robotPtr, map);
-                break;
-            case 'L':
-                right(robotPtr, map);//need to invert rotation (right/left) but not forward 
-                break;
-            case 'R':
-                left(robotPtr, map);
-                break;
-            default:
-                break;
+        case 'F':
+            forward(robotPtr, map);
+            break;
+        case 'L':
+            right(robotPtr, map); // need to invert rotation (right/left) but not forward
+            break;
+        case 'R':
+            left(robotPtr, map);
+            break;
+        default:
+            break;
         }
     }
 }
 
 void turnAround(Robot *robotPtr, int map[DIMENSIONS][DIMENSIONS]) {
-    //two rights or lefts make you turn around
+    // two rights or lefts make you turn around
     right(robotPtr, map);
     right(robotPtr, map);
 }
