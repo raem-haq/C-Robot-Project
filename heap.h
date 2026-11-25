@@ -16,6 +16,7 @@ typedef struct {
 void heap_init(MinHeap *heap, int capacity, size_t elementSize, CompareFn compare);
 void heap_push(MinHeap *heap, const void *element);
 void heap_pop(MinHeap *heap, void *result);
+const void *heap_peek(const MinHeap *heap);
 int heap_empty(const MinHeap *heap);
 void heap_free(MinHeap *heap);
 

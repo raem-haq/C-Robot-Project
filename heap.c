@@ -137,6 +137,10 @@ void heap_pop(MinHeap *heap, void *result) {
     memcpy(heap_element(heap, index), heap_element(heap, heap->size), heap->elementSize);
 }
 
+const void *heap_peek(const MinHeap *heap) {
+    return heap->size == 0 ? NULL : heap->data;
+}
+
 int heap_empty(const MinHeap *heap) {
     return heap->size == 0;
 }
