@@ -1,6 +1,6 @@
 #include "dstar.h"
-#include <limits.h>
 #include <assert.h>
+#include <limits.h>
 
 void dstar_init(DStar *ds) {
     assert(ds != NULL);
@@ -19,8 +19,7 @@ void dstar_init(DStar *ds) {
     ds->home = (Point){0, 0};
     ds->km = 0;
     ds->expansions = 0;
-    heap_init(&ds->queue, DIMENSIONS * DIMENSIONS, sizeof(QueueEntry),
-              compare_queue_entries);
+    heap_init(&ds->queue, DIMENSIONS * DIMENSIONS, sizeof(QueueEntry), compare_queue_entries);
 }
 
 static int compare_queue_entries(const void *left, const void *right) {
@@ -43,4 +42,25 @@ int key_compare(Key a, Key b) {
         return 1;
     }
     return 0;
+}
+
+void dstar_free(DStar *ds) {
+    assert(ds != NULL);
+    heap_free(&ds->queue);
+}
+
+void queue_insert(DStar *ds, Point p, Key key) {
+    assert(ds != NULL);
+    assert(in_bounds(p));
+
+    ds->inQueue[p.x][p.y] = true;
+    ds->queuedKey[p.x][p.y] = key;
+    QueueEntry entry = {p, key};
+    heap_push(&ds->queue, &entry);
+}
+
+void queue_remove(DStar *ds, Point p) {
+    assert(ds != NULL);
+
+    ds->inQueue[p.x][p.y] = false;
 }

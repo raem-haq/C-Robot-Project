@@ -32,5 +32,8 @@ typedef struct {
 
 void dstar_init(DStar *ds);
 int key_compare(Key a, Key b);
+void queue_insert(DStar *ds, Point p, Key key);
+void queue_remove(DStar *ds, Point p);
+void dstar_free(DStar *ds);
 
 #endif
