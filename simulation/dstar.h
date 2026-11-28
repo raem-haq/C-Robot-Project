@@ -28,9 +28,10 @@ typedef struct {
     Point home;
     int km;
     unsigned long expansions;
+    Belief *map;
 } DStar;
 
-void dstar_init(DStar *ds);
+void dstar_init(DStar *ds, Belief *robotBelief);
 int key_compare(Key a, Key b);
 void queue_insert(DStar *ds, Point p, Key key);
 void queue_remove(DStar *ds, Point p);

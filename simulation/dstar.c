@@ -15,7 +15,7 @@ static int compare_queue_entries(const void *left, const void *right) {
     return key_compare(leftEntry->key, rightEntry->key);
 }
 
-void dstar_init(DStar *ds) {
+void dstar_init(DStar *ds, Belief *robotBelief) {
     assert(ds != NULL);
 
     for (int x = 0; x < DIMENSIONS; x++) {
@@ -32,6 +32,7 @@ void dstar_init(DStar *ds) {
     ds->home = (Point){0, 0};
     ds->km = 0;
     ds->expansions = 0;
+    ds->map = robotBelief;
     heap_init(&ds->queue, DIMENSIONS * DIMENSIONS, sizeof(QueueEntry), compare_queue_entries);
 }
 
@@ -134,9 +135,7 @@ void update_vertex(DStar *ds, Point p) {
             Point pred = {p.x + directionX[i], p.y + directionY[i]};
             if (!in_bounds(pred))
                 continue;
-            ds->rhs[p.x][p.y] = min(smallest, ds->g[pred.x][pred.y] + 1);
-            // the plus one is not needed but if the cost from one square to the next ever changes
-            // it'll be replaced with the cost from the neighbouring cell to the current
+            ds->rhs[p.x][p.y] = min(smallest, ds->g[pred.x][pred.y] + edge_cost(ds, p, pred) );
         }
         ds->rhs[p.x][p.y] = smallest;
     }
@@ -150,57 +149,70 @@ static bool is_same_point(Point a, Point b) {
     return (a.x == b.x && a.y == b.y);
 }
 
-static int directionX[] = {0, 1, 0, -1, 0};
-static int directionY[] = {-1, 0, 1, 0, 0};
+static int directionX[] = {0, 1, 0, -1};
+static int directionY[] = {-1, 0, 1, 0};
 
 void compute_shortest_path(DStar *ds) {
     Point start = ds->start;
     while (key_compare(queue_top_key(ds), calculate_key(ds, ds->start)) < 0 ||
            ds->rhs[start.x][start.y] > ds->g[start.x][start.y]) {
-        Point topPoint = queue_top_point(ds);
+        Point u = queue_top_point(ds);
         Key keyOld = queue_top_key(ds);
-        Key keyNew = calculate_key(ds, topPoint);
+        Key keyNew = calculate_key(ds, u);
+        ds->expansions++;
 
         if (key_compare(keyOld, keyNew) < 0) {
-            queue_insert(ds, topPoint, keyNew);
-        } else if (ds->g[topPoint.x][topPoint.y] > ds->rhs[topPoint.x][topPoint.y]) {
-            ds->g[topPoint.x][topPoint.y] = ds->rhs[topPoint.x][topPoint.y];
-            queue_remove(ds, topPoint);
+            queue_insert(ds, u, keyNew);
+        } else if (ds->g[u.x][u.y] > ds->rhs[u.x][u.y]) {
+            ds->g[u.x][u.y] = ds->rhs[u.x][u.y];
+            queue_remove(ds, u);
             for (int i = 0; i < 4; i++) {
-                Point pred = {topPoint.x + directionX[i], topPoint.y + directionY[i]};
-                if (!in_bounds(pred))
-                    continue;
-                if (!is_same_point(pred, ds->last)) {
-                    ds->rhs[topPoint.x][topPoint.y] =
-                        min(ds->rhs[pred.x][pred.y], ds->g[pred.x][pred.y] + 1);
-                }
-                update_vertex(ds, pred);
+                Point pred = {u.x + directionX[i], u.y + directionY[i]};
+                if (in_bounds(pred)) update_vertex(ds, pred);
             }
         } else {
-            int g_old = ds->g[topPoint.x][topPoint.y];
-            ds->g[topPoint.x][topPoint.y] = INT_MAX;
-            for (int i = 0; i < 5; i++) {
-                Point pred = {topPoint.x + directionX[i], topPoint.y + directionY[i]};
-                /* Following maybe unnecessary if Pred(s) == Succ(s) as in our case
-                int cost = directionX[i] == directionY[i] && directionX[i] == 0 ? 0 : 1
-                if (!in_bounds(pred)) continue;
-                if (ds->rhs[pred.x][pred.y] == cost +  g_old){
-                    if (!is_same_point(pred, ds->last)){
-                        int smallest = INT_MAX;
-                        for (int j = 0; j < 4; j++){
-                            Point succ = {pred.x + directionX[i], pred.y + directionY[i]};
-                            if (!in_bounds(succ)) continue;
-                            ds->rhs[p.x][p.y] = min(smallest, ds->g[succ.x][succ.y] + 1);
-                        }
-                        ds->rhs[pred.x][pred.y] = smallest;
-                    }
-                }
-                */
-                update_vertex(ds, pred);
+            int g_old = ds->g[u.x][u.y];
+            ds->g[u.x][u.y] = INT_MAX;
+            update_vertex(ds, u);
+            for (int i = 0; i < 4; i++) {
+                Point pred = {u.x + directionX[i], u.y + directionY[i]};
+                if (in_bounds(pred)) update_vertex(ds, pred);
             }
         }
     }
 }
+
 static bool in_bounds(Point p) {
     return (p.x >= 0 && p.x < DIMENSIONS && p.y >= 0 && p.y < DIMENSIONS);
+}
+
+/*
+void dstar_main(DStar* ds){
+    ds->last = ds->start;
+    dstar_init(ds);
+    compute_shortest_path(ds);
+    while (!is_same_point(ds->start, ds->last)){
+
+    }
+}
+
+static Point min_start(DStar *ds){
+    Point argmin;
+    int m;
+    for (int i = 0; i < 4; i++){
+        Point pred = {ds->start.x + directionX[i], ds->start.y + directionY[i]};
+
+
+    }
+}
+*/
+static bool are_adjacent(Point a, Point b){
+    return abs(a.x - b.x) + abs(a.y - b.y) == 1;
+}
+
+static int edge_cost(DStar *ds, Point from, Point to) {
+    assert(are_adjacent(from, to));
+    assert(in_bounds(from));
+    assert(in_bounds(to));
+    return ds->map->cell[to.x][to.y] == BLOCKED ? INT_MAX : 1;
 }
