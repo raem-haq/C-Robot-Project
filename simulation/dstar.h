@@ -36,5 +36,6 @@ void queue_insert(DStar *ds, Point p, Key key);
 void queue_remove(DStar *ds, Point p);
 void dstar_free(DStar *ds);
 Point queue_pop(DStar *ds);
+Key queue_top_key(DStar *ds);
 
 #endif

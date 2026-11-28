@@ -1,6 +1,7 @@
 #include "dstar.h"
 #include <limits.h>
 #include <assert.h>
+#include <stdlib.h>
 
 static bool entry_is_current(const DStar *ds, const QueueEntry *entry);
 static void discard_stale_entries(DStar *ds);
@@ -96,3 +97,42 @@ Point queue_pop(DStar *ds) {
     return entry.point;
 }
 
+Key queue_top_key(DStar *ds) {
+    assert(ds != NULL);
+    discard_stale_entries(ds);
+
+    if (heap_empty(&ds->queue)) {
+        return (Key){INT_MAX, INT_MAX};
+    }
+
+    const QueueEntry *entry = heap_peek(&ds->queue);
+    return entry->key;
+}
+
+Key calculate_key(DStar *ds, Point p){
+    int v = min(ds->g[p.x][p.y], ds->rhs[p.x][p.y]);
+    return (Key){ v + heuristic(ds->home, p),  v};
+}
+
+static int heuristic(Point a, Point b) {
+    return abs(a.x - b.x) + abs(a.y - b.y);
+}
+
+static int directionX[] = {0, 1, 0, -1};
+static int directionY[] = {-1, 0, 1, 0};
+
+void update_vertex(DStar* ds, Point p){
+    if (ds->start.x != p.x || ds->start.y != p.y){
+        int smallest = INT_MAX;
+        for (int d = 0; d < 4; d++){
+            ds->rhs[p.x][p.y] = min(smallest, ds->g[p.x + directionX[d]][p.y + directionY[d]] + 1); 
+            // the plus one is not needed but if the cost from one square to the next ever changes
+            // it'll be replaced with the cost from the neighbouring cell to the current 
+        }
+        ds->rhs[p.x][p.y] = smallest;
+    }
+    queue_remove(ds, p);
+    if (ds->g[p.x][p.y] != ds->rhs[p.x][p.y]){
+        queue_insert(ds, p, calculate_key(ds, p));
+    }
+}
