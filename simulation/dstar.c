@@ -186,26 +186,50 @@ static bool in_bounds(Point p) {
     return (p.x >= 0 && p.x < DIMENSIONS && p.y >= 0 && p.y < DIMENSIONS);
 }
 
-/*
-void dstar_main(DStar* ds){
-    ds->last = ds->start;
-    dstar_init(ds);
+static bool best_successor(const DStar *ds, Point *out) {
+    int best = INT_MAX;
+    for (int i = 0; i < 4; i++) {
+        Point s = {ds->start.x + directionX[i], ds->start.y + directionY[i]};
+        if (!in_bounds(s)) continue;
+        int c = add_cost(ds->g[s.x][s.y], edge_cost(ds, ds->start, s));
+        if (c < best) { best = c; *out = s; }
+    }
+    return best != INT_MAX; // false = no known path
+}
+
+
+void dstar_main(DStar* ds, Belief *b){ //returns to home square
+    dstar_init(ds, b);
     compute_shortest_path(ds);
-    while (!is_same_point(ds->start, ds->last)){
+    while (!is_same_point(ds->start, ds->home)){
+        Point next;
+        if (!best_successor(ds, &next)) break;
 
+        ds->start = next; // robot needs to move to next
+
+        Point changed[DIMENSIONS * DIMENSIONS];
+        int n = scan_changed_cells(changed);
+        if (n > 0) {
+            ds->km  += heuristic(ds->last, ds->start);   // k_m = k_m + h(s_last, s_start)
+            ds->last = ds->start;
+
+            for (int k = 0; k < n; k++) {
+                update_vertex(ds, changed[k]);
+                for (int i = 0; i < 4; i++) {
+                    Point p = {changed[k].x + directionX[i], changed[k].y + directionY[i]};
+                    if (in_bounds(p)) update_vertex(ds, p);
+                }
+            }
+            compute_shortest_path(ds);
+        }
     }
 }
 
-static Point min_start(DStar *ds){
-    Point argmin;
-    int m;
-    for (int i = 0; i < 4; i++){
-        Point pred = {ds->start.x + directionX[i], ds->start.y + directionY[i]};
-
-
-    }
+static int scan_changed_cells(Point changed[DIMENSIONS][DIMENSIONS]){ // Where belief changed.
+    return 0;
 }
-*/
+
+
 static bool are_adjacent(Point a, Point b){
     return abs(a.x - b.x) + abs(a.y - b.y) == 1;
 }
